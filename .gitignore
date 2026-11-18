@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.sites-runtime/
+.sites-checkout*/
+.local/
+.env
+.env.*
+!.env.example
+*.tgz
+*.tar.gz

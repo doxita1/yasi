@@ -1,0 +1,1 @@
+ALTER TABLE `ai_config` ADD `deep_model` text;

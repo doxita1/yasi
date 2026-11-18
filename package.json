@@ -1,0 +1,19 @@
+{
+  "name": "shijie-ielts-studio",
+  "description": "拾阶英语 · IELTS and workplace English study room",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/preview.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test server/*.test.mjs scripts/*.test.mjs",
+    "test:browser": "node scripts/browser-smoke.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "devDependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

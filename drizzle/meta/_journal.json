@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1794987695329,
+      "tag": "0000_learning",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794987845377,
+      "tag": "0001_deep_model",
+      "breakpoints": true
+    }
+  ]
+}
