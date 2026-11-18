@@ -1,0 +1,426 @@
+.trainingHero .heroText {
+  max-width: 78%;
+  padding: 26px 30px;
+}
+.trainingHero h2 {
+  font-size: clamp(26px, 2.65vw, 39px);
+  letter-spacing: -1px;
+}
+.trainingHero .topicLine {
+  font:
+    italic 550 16px Georgia,
+    serif;
+  margin: 6px 0 8px;
+  color: #486045;
+}
+.trainingHero .heroLabel {
+  letter-spacing: 1.2px;
+}
+.trainingHero .heroActions {
+  margin-top: 18px;
+}
+.sidebar {
+  overflow-y: auto;
+}
+.materialPassage {
+  font:
+    19px/1.85 Georgia,
+    serif;
+}
+.materialPrompt {
+  margin: 14px 0 20px;
+}
+.sourceItem {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.sourceItem summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.sourceItem p {
+  line-height: 1.7;
+}
+.skillShelf {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+.skillPath {
+  display: grid;
+  gap: 9px;
+  padding: 19px 20px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.skillPath:hover,
+.paperCard:hover {
+  border-color: #91aa80;
+  background: #f9fbf3;
+}
+.skillPath .sectionRow {
+  flex-wrap: nowrap;
+}
+.skillPath h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.skillPath p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0;
+  color: var(--muted);
+}
+.skillPath .tileIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+.paperCard {
+  display: block;
+  padding: 20px;
+}
+.paperCard h2 {
+  font:
+    650 21px/1.35 Georgia,
+    "Microsoft YaHei",
+    serif;
+  margin: 10px 0;
+}
+.paperCard p {
+  color: var(--muted);
+  line-height: 1.5;
+  font-size: 13px;
+}
+.paperCard .sectionRow > b {
+  font-size: 12px;
+  color: var(--green);
+}
+.readerHeading {
+  margin: 21px 0 15px;
+}
+.readerHeading h1 {
+  font:
+    650 clamp(24px, 2.6vw, 38px)/1.18 Georgia,
+    serif;
+}
+.readSplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 14px;
+  align-items: start;
+}
+.readTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #f1f4e9;
+  font-size: 13px;
+}
+.readTop span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.readTop .pill {
+  padding: 4px 10px;
+}
+.readArticle {
+  padding: 20px 22px;
+  max-height: min(65vh, 760px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.readArticle h2 {
+  font:
+    650 25px/1.3 Georgia,
+    serif;
+  margin: 9px 0 23px;
+}
+.paragraph {
+  display: grid;
+  grid-template-columns: 23px 1fr;
+  align-items: start;
+  gap: 7px;
+  scroll-margin: 18px;
+  margin-bottom: 17px;
+}
+.paragraph > b {
+  font:
+    700 12px/23px "Segoe UI",
+    sans-serif;
+  background: #edf2e3;
+  text-align: center;
+  color: #486340;
+  border-radius: 5px;
+}
+.paragraph p,
+.scenarioText {
+  font:
+    17px/1.72 Georgia,
+    "Times New Roman",
+    serif;
+  letter-spacing: 0.005em;
+  margin: 0;
+  color: #24392d;
+}
+.paragraph mark {
+  background: #e7ec94;
+  color: inherit;
+  border-radius: 2px;
+}
+.readActions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+.readSide {
+  display: grid;
+  gap: 12px;
+}
+.questionBody {
+  padding: 16px;
+}
+.questionBody .instructions {
+  margin: 0 0 15px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.questionBody h3 {
+  font:
+    600 17px/1.5 Georgia,
+    serif;
+  margin: 6px 0 13px;
+}
+.questionBody details {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.questionBody textarea {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.questionBody .readActions {
+  padding: 14px 0 2px;
+}
+.questionBody button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.answerRadio {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  cursor: pointer;
+  border-radius: 7px;
+  font-size: 14px;
+}
+.answerRadio:has(input:checked) {
+  border-color: #799a62;
+  background: #f0f5e5;
+}
+.answerRadio input {
+  accent-color: var(--green);
+}
+.numberPanel {
+  padding: 15px;
+}
+.numberPanel b {
+  font-size: 13px;
+}
+.numberGrid {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+.numberGrid button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  position: relative;
+  background: white;
+}
+.numberGrid .answered {
+  background: #e9efdc;
+  color: var(--green);
+}
+.numberGrid .current {
+  outline: 2px solid #447651;
+  outline-offset: 1px;
+}
+.numberGrid .miss {
+  background: #f7e9dc;
+  color: #7e4a26;
+}
+.numberGrid .flagged:after {
+  content: "";
+  position: absolute;
+  right: 1px;
+  top: 1px;
+  width: 7px;
+  height: 7px;
+  background: #d69850;
+  border-radius: 50%;
+}
+.readFeedback {
+  background: #f9eee4;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 14px 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.readFeedback.correct {
+  background: #ecf3e7;
+}
+.readFeedback p {
+  margin: 7px 0;
+}
+.readFeedback blockquote,
+.rowSet blockquote {
+  border-left: 3px solid #8b9a66;
+  padding-left: 12px;
+  margin: 12px 0;
+  font:
+    16px/1.5 Georgia,
+    serif;
+}
+.sheetResult {
+  padding: 15px 20px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.sheetResult h2 {
+  font-size: 27px;
+  margin: 6px 0;
+}
+.sheetResult small {
+  font-size: 13px;
+}
+.sheetResult > div:last-child {
+  font-size: 12px;
+  line-height: 1.8;
+}
+.submitBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f2edcb;
+  border: 1px solid #d9d2a9;
+  border-radius: 10px;
+  padding: 10px 15px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.mobileReadTabs {
+  display: none;
+}
+.labStats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.labStats > span {
+  flex: 1;
+}
+.labStats b {
+  font:
+    650 27px/1.1 Georgia,
+    serif;
+  color: var(--green);
+  display: block;
+}
+.labStats small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.resumeItem {
+  display: block;
+  border-top: 1px solid var(--line);
+  padding: 11px 0;
+  font-size: 13px;
+}
+.resumeItem small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.taskCard {
+  margin: 12px 0;
+}
+.taskCard h2 {
+  font-size: 20px;
+}
+.planInputs {
+  min-width: 0;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  line-height: 1.5;
+}
+.paperOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+@media (max-width: 780px) {
+  .readSplit {
+    display: block;
+  }
+  .mobileReadTabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .readSplit[data-tab="questions"] .readPaper,
+  .readSplit[data-tab="passage"] .readSide {
+    display: none;
+  }
+  .readArticle {
+    max-height: 67vh;
+  }
+  .sheetResult {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .trainingHero .heroText {
+    padding: 20px 17px;
+    max-width: 88%;
+  }
+  .trainingHero .heroActions .btn {
+    font-size: 11px;
+  }
+  .skillPath {
+    padding: 13px;
+  }
+  .skillShelf {
+    gap: 8px;
+  }
+  .trainingHero .topicLine {
+    font-size: 14px;
+  }
+  .submitBanner {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,319 @@
+.il-main {
+  --il-green: #204c39;
+  --il-ink: #24312a;
+  --il-line: #d9e1d5;
+  --il-cream: #f6f7ef;
+  max-width: 1000px;
+  margin: auto;
+  color: var(--il-ink);
+  padding: clamp(12px, 2vw, 26px);
+  box-sizing: border-box;
+}
+.il-main * {
+  box-sizing: border-box;
+}
+.il-main button,
+.il-main textarea,
+.il-main input {
+  font: inherit;
+}
+.il-main button,
+.il-main summary,
+.il-options label {
+  cursor: pointer;
+}
+.il-main :focus-visible {
+  outline: 3px solid #788f38;
+  outline-offset: 3px;
+}
+.il-header {
+  margin: 17px 0 24px;
+}
+.il-kicker,
+.il-q small,
+.il-count {
+  font-size: 0.73rem;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: #516c57;
+}
+.il-header h1 {
+  font-size: clamp(1.8rem, 4vw, 2.75rem);
+  letter-spacing: -0.045em;
+  line-height: 1.25;
+  margin: 8px 0;
+}
+.il-header p,
+.il-intro p,
+.il-tile p,
+.il-clue,
+.il-notes,
+.il-writing p {
+  color: #59675b;
+  line-height: 1.65;
+  font-size: 0.91rem;
+  margin: 0.45em 0;
+}
+.il-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 255px), 1fr));
+  gap: 14px;
+}
+.il-tile,
+.il-intro,
+.il-deck,
+.il-q,
+.il-writing,
+.il-result,
+.il-audio {
+  border: 1px solid var(--il-line);
+  border-radius: 15px;
+  background: #fff;
+}
+.il-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  color: inherit;
+  padding: 21px;
+  min-height: 185px;
+}
+.il-tile:hover {
+  border-color: #91a180;
+  background: var(--il-cream);
+}
+.il-tile h2 {
+  margin: 9px 0 3px;
+  font-size: 1.22rem;
+}
+.il-tile > span:last-child {
+  margin-top: auto;
+  padding-top: 12px;
+  color: var(--il-green);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.il-intro,
+.il-deck,
+.il-writing {
+  padding: 18px 22px;
+  margin: 15px 0;
+}
+.il-intro .il-btn {
+  margin-top: 7px;
+}
+.il-btn {
+  border: 1px solid #aebca9;
+  color: var(--il-green);
+  background: #fff;
+  border-radius: 9px;
+  padding: 9px 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+.il-primary {
+  background: var(--il-green);
+  color: #fff;
+  border-color: var(--il-green);
+}
+.il-inline {
+  padding: 3px 0;
+  border: 0;
+  color: var(--il-green);
+  background: transparent;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: left;
+}
+.il-deck {
+  background: var(--il-cream);
+}
+.il-deck summary {
+  font-weight: 650;
+}
+.il-deck article {
+  padding-top: 13px;
+  line-height: 1.6;
+}
+.il-deck p {
+  margin: 0.3em 0;
+}
+.il-notes {
+  border-top: 1px solid var(--il-line);
+  margin-top: 24px;
+  padding-top: 13px;
+  font-size: 0.78rem;
+}
+.il-notes a {
+  color: var(--il-green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.il-result,
+.il-audio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 15px 20px;
+  margin: 12px 0;
+}
+.il-result {
+  background: #dcecaf;
+  color: #203d29;
+}
+.il-result b {
+  font-size: 1.6rem;
+}
+.il-result p,
+.il-audio p {
+  font-size: 0.82rem;
+  margin: 3px 0;
+}
+.il-audio {
+  background: #edf4e6;
+}
+.il-count {
+  text-align: right;
+  margin: 12px 0;
+}
+.il-q {
+  display: flex;
+  gap: 16px;
+  padding: 18px clamp(13px, 3vw, 24px);
+  margin: 12px 0;
+}
+.il-index {
+  color: #69786d;
+  padding-top: 3px;
+  font-size: 0.83rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.il-question {
+  flex: 1;
+  min-width: 0;
+}
+.il-q h3,
+.il-writing h3 {
+  font-size: clamp(1rem, 2vw, 1.16rem);
+  line-height: 1.55;
+  margin: 4px 0 11px;
+}
+.il-question p {
+  line-height: 1.65;
+}
+.il-options {
+  display: grid;
+  gap: 6px;
+}
+.il-options label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--il-line);
+  border-radius: 8px;
+  background: #fcfdf8;
+  line-height: 1.45;
+}
+.il-options label:has(:checked) {
+  border-color: #78946f;
+  background: #eff5e8;
+}
+.il-options input {
+  accent-color: var(--il-green);
+}
+.il-options b {
+  margin-right: 3px;
+  color: #56725a;
+  font-size: 0.85rem;
+}
+.il-answer {
+  padding: 10px 13px;
+  border: 1px solid #b9c6b6;
+  background: #f9faf5;
+  color: var(--il-ink);
+  border-radius: 8px;
+  width: 100%;
+  line-height: 1.5;
+}
+.il-answer[readonly] {
+  color: #536052;
+}
+.il-feedback {
+  margin-top: 12px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  line-height: 1.55;
+}
+.il-feedback p {
+  margin: 0.3em 0;
+}
+.il-feedback blockquote {
+  border-left: 3px solid #83977f;
+  margin: 9px 0;
+  padding: 5px 12px;
+  background: #ffffff70;
+}
+.il-correct {
+  background: #edf5e6;
+}
+.il-missed,
+.il-message:not(:empty) {
+  background: #fcf3e6;
+}
+.il-message:not(:empty) {
+  padding: 11px;
+  border-radius: 8px;
+}
+.il-writing {
+  margin-bottom: 7px;
+}
+.il-main textarea {
+  resize: vertical;
+}
+@media (max-width: 600px) {
+  .il-main {
+    padding: 9px 0;
+  }
+  .il-q {
+    gap: 9px;
+  }
+  .il-grid {
+    grid-template-columns: 1fr;
+  }
+  .il-tile {
+    min-height: 155px;
+  }
+  .il-audio,
+  .il-result,
+  .il-intro,
+  .il-deck {
+    padding: 13px;
+  }
+}
+.il-daybar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 13px 0;
+}
+.il-intro label {
+  display: block;
+  margin: 12px 0;
+}
+.il-intro select {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--il-line);
+  border-radius: 7px;
+  color: var(--il-ink);
+  background: var(--il-cream);
+}
+.il-intro .il-answer {
+  margin-top: 8px;
+}

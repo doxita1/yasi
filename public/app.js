@@ -10,7 +10,15 @@ import {
 import { mountPlayer, mountReview, isSharedBlock } from "./player.js";
 import { mountSettings } from "./settings.js";
 import { resourcePanel } from "./resources.js";
-import { skillsPanel, bindEvidence, diagnosticCTA } from "./progress.js";
+import {
+  deskHtml,
+  mountStudyDay,
+  mistakesHtml,
+  labReportHtml,
+  isDayDone,
+  currentStudyDay,
+} from "./exam-desk.js";
+import { skillsPanel, bindEvidence } from "./progress.js";
 
 const BASE = {
   vocab: ["单词", "words", "vocab"],
@@ -24,17 +32,21 @@ const TABS = [
     [
       ["home", "home", "学习工作台"],
       ["courses", "layers", "全部课程"],
-      ["review", "review", "复习本"],
+      ["mistakes", "review", "雅思错题本"],
       ["report", "chart", "学习报告"],
+      ["materials", "layers", "资料精练"],
     ],
   ],
   [
-    "专项练习",
+    "雅思训练",
     [
-      ["subject/vocab", "words", "单词学习"],
-      ["subject/grammar", "grammar", "语法学习"],
-      ["subject/exam", "headphones", "雅思四科"],
-      ["subject/work", "chat", "职场对话"],
+      ["reading", "book", "限时阅读"],
+      ["listening", "headphones", "听力精练"],
+      ["writing", "pen", "写作批改"],
+      ["speaking", "mic", "口语考场"],
+      ["lexis", "words", "学术词汇"],
+      ["dictation", "headphones", "词汇听写"],
+      ["accuracy", "grammar", "语法与改写"],
       ["mocks", "flag", "模拟考试"],
     ],
   ],
@@ -126,9 +138,11 @@ function current() {
   return { day: DAYS, id: "work", paused: false, item: 1 };
 }
 function getSummary() {
-  const rows = sessionLines(),
+  const rows = Object.values(state().attempts),
     seen = new Set(
-      rows.filter((a) => a.completed).map((a) => a.day + ":" + a.blockId),
+      rows
+        .filter((a) => a.completed && a.blockId)
+        .map((a) => a.day + ":" + a.blockId),
     );
   const actual = {};
   for (const a of rows)
@@ -167,7 +181,7 @@ function weekStrip(week, sel) {
       return link(
         "day/" + d,
         "<span>Day</span><i>" + String(d).padStart(2, "0") + "</i>",
-        (d === sel ? "sel " : "") + (completeBlocks(d) ? "learned" : ""),
+        (d === sel ? "sel " : "") + (isDayDone(d) ? "learned" : ""),
       );
     }).join("") +
     "</div>"
@@ -211,23 +225,6 @@ function taskRow(day, b) {
     "task",
   );
 }
-function taskPanel(day) {
-  const l = getDay(day, curTrack());
-  return (
-    '<section class="panel">' +
-    section(
-      "当天练习 <small>4 项</small>",
-      link(
-        "day/" + day,
-        "第 " + day + " 天 " + icon("right", 13),
-        "miniAction",
-      ),
-    ) +
-    '<div class="taskList">' +
-    l.blocks.map((b) => taskRow(day, b)).join("") +
-    "</div></section>"
-  );
-}
 function resumePanel() {
   const pending = incomplete().slice(0, 3);
   if (!pending.length) return "";
@@ -246,122 +243,6 @@ function resumePanel() {
     "</div></section>"
   );
 }
-function dash() {
-  const diagnostic = diagnosticCTA(state(), getDay);
-  const ref = current(),
-    day = ref.day,
-    w = Math.ceil(day / 6),
-    lesson = getDay(day, curTrack()),
-    done = completeBlocks(day),
-    sum = getSummary(),
-    weekDone = Array.from({ length: 6 }, (_, i) =>
-      completeBlocks((w - 1) * 6 + i + 1),
-    ).reduce((a, b) => a + b, 0);
-  const pct = Math.round((weekDone / 24) * 100),
-    pf = state().profile;
-  const title = ref.paused ? "继续上次的练习" : "开始今天的练习";
-  return (
-    pageHead(
-      "学习工作台",
-      "26 周学习计划 · 每周 6 天 · 每天约 60 分钟",
-      "STUDY DESK",
-      '<span class="syncPill" id="syncStatus">' + barStatus() + "</span>",
-    ) +
-    '<div class="dashboard"><div class="column"><section class="hero"><img class="heroArt" src="/assets/london.jpg" alt="伦敦钟楼与泰晤士河版画"><div class="heroText"><span class="heroLabel">' +
-    icon("book", 13) +
-    " 学习日 " +
-    String(day).padStart(2, "0") +
-    " / 156</span><h2>" +
-    esc(lesson.title) +
-    "</h2><p>第 " +
-    w +
-    " 周 · " +
-    "4 项练习 · 约 60 分钟" +
-    (ref.paused ? " · 第 " + ref.item + " 题" : "") +
-    '</p><div class="heroActions">' +
-    btn("learn/" + day + "/" + ref.id, title, "green") +
-    (day < DAYS ? btn("day/" + (day + 1), "学习下一天", "", "right") : "") +
-    "</div></div></section>" +
-    taskPanel(day) +
-    resumePanel() +
-    '<section class="panel">' +
-    section(
-      "专项入口",
-      link("courses", "全部课程 " + icon("right", 13), "miniAction"),
-    ) +
-    '<div class="gridTools">' +
-    Object.entries(BASE)
-      .map(([id, [name, sym]]) =>
-        link("subject/" + id, icon(sym, 18) + name, "toolTile"),
-      )
-      .join("") +
-    "</div></section></div>" +
-    '<aside class="column"><section class="panel sideCard"><div class="sideCardHead"><h2 class="cardTitle">本周进度</h2><span class="roundNum">W' +
-    String(w).padStart(2, "0") +
-    '</span></div><div class="ringArea"><div class="ring" style="--angle:' +
-    pct * 3.6 +
-    'deg"><strong>' +
-    pct +
-    '%</strong></div><div class="ringInfo"><b>' +
-    weekDone +
-    ' / 24 项</b>本周已完成</div></div><div class="statPair"><div><strong>' +
-    sum.studied +
-    "</strong><span>已学习天数</span></div><div><strong>" +
-    Math.round(Object.values(sum.actual).reduce((a, b) => a + b, 0) / 60) +
-    "</strong><span>累计分钟</span></div></div></section>" +
-    '<section class="panel sideCard"><div class="sideCardHead"><h2 class="cardTitle">本周学习日</h2>' +
-    icon("calendar", 17) +
-    "</div>" +
-    weekStrip(w, day) +
-    '<div class="mutedRow">可任选一天，未完成的课程随时续练。</div></section>' +
-    '<section class="panel sideCard goalCard"><div class="sideCardHead"><h2 class="cardTitle">雅思目标</h2>' +
-    icon("flag", 18) +
-    '</div><div class="goal"><strong>' +
-    Number(pf.targetBand).toFixed(1) +
-    '</strong><span>总分目标</span></div><div class="sectionRow"><span class="mutedRow">单项至少 ' +
-    esc(pf.minBand) +
-    "</span>" +
-    link("settings", "调整目标 " + icon("right", 13), "miniAction") +
-    '</div><div class="goalDetail"><span>' +
-    esc(diagnostic.status) +
-    '</span><a class="miniAction" href="' +
-    esc(diagnostic.href) +
-    '">' +
-    esc(diagnostic.label) +
-    icon("right", 12) +
-    "</a></div></section>" +
-    '<section class="panel sideCard"><div class="sideCardHead"><h2 class="cardTitle">待复习</h2>' +
-    icon("review", 18) +
-    '</div><p class="pageNote">今天有 ' +
-    listDueReviews().length +
-    " 项词汇或语法需要回顾。</p>" +
-    link("review", "打开复习本 " + icon("arrow", 14), "miniAction") +
-    "</section></aside></div>"
-  );
-}
-function dayPage(n) {
-  const d = cleanDay(n),
-    l = getDay(d, curTrack()),
-    complete = completeBlocks(d);
-  return (
-    pageHead("第 " + d + " 天 · " + l.title, l.weekTitle, "LEARNING DAY") +
-    '<div class="rowSet"><div class="sectionRow"><div class="dateNav">' +
-    (d > 1 ? link("day/" + (d - 1), icon("left", 16)) : "") +
-    "<span>第 " +
-    d +
-    " / 156 天</span>" +
-    (d < DAYS ? link("day/" + (d + 1), icon("right", 16)) : "") +
-    "</div>" +
-    btn(
-      "learn/" + d + "/" + nextUnit(d),
-      complete === 4 ? "再次练习" : "继续这一天",
-      "green",
-    ) +
-    "</div>" +
-    taskPanel(d) +
-    "</div>"
-  );
-}
 const phases = [
   [1, 2, "起点诊断"],
   [3, 8, "打牢基础"],
@@ -376,7 +257,7 @@ function courses(filter) {
   return (
     pageHead(
       "全部课程",
-      "26 周 · 156 个学习日。选中任意一天，即可打开它的四项练习。",
+      "26 周 · 156 个学习日。每一天都可提前进入，完成专项后用一道迁移任务订正。",
       "COURSE LIBRARY",
     ) +
     '<div class="filters">' +
@@ -399,7 +280,7 @@ function courses(filter) {
           "</span></div><h3>" +
           esc(name) +
           "</h3>" +
-          weekStrip(w, current().day) +
+          weekStrip(w, currentStudyDay()) +
           "</article>"
         );
       })
@@ -465,7 +346,7 @@ function report() {
     resumePanel() +
     '</div><aside class="column"><section class="panel sideCard"><h2 class="cardTitle">学习记录</h2><div class="ringInfo"><p><b>' +
     sum.finished +
-    " / 624</b>已完成课程任务</p><p><b>" +
+    " / 624</b>已完成基础补练</p><p><b>" +
     pending.length +
     " 项</b>未完成任务</p><p><b>" +
     weeksDone +
@@ -541,7 +422,7 @@ async function render() {
   dispose?.();
   dispose = () => {};
   indexAttempts();
-  const [raw, a, b] = route(),
+  const [raw, a, b, attemptId] = route(),
     page = raw || "home",
     main = document.querySelector("#main");
   const name =
@@ -555,6 +436,15 @@ async function render() {
       day: "学习日",
       learn: "课程练习",
       subject: BASE[a]?.[0],
+      reading: "阅读训练",
+      listening: "听力精练",
+      writing: "写作批改",
+      speaking: "口语考场",
+      materials: "资料精练",
+      dictation: "词汇听写",
+      lexis: "学术词汇",
+      accuracy: "语法与改写",
+      mistakes: "雅思错题本",
     }[page] || "学习工作台";
   document.title = name + " · 拾阶英语";
   document.querySelector("#crumb").textContent = name;
@@ -576,6 +466,66 @@ async function render() {
   main.replaceChildren();
   main.dataset.route = route().join("/") || "home";
   try {
+    const week = Number(a) || undefined;
+    if (page === "reading") {
+      const { mountReadingRoom } = await import("./reading-room.js");
+      if (run === version)
+        dispose = mountReadingRoom(main, {
+          setId: a,
+          question: b,
+          attemptId,
+          track: curTrack(),
+          onNavigate: nav,
+        });
+      return;
+    }
+    if (page === "materials") {
+      const { mountMaterials } = await import("./materials.js");
+      if (run === version)
+        dispose = mountMaterials(main, { unit: a, question: b });
+      return;
+    }
+    if (page === "listening" || page === "lexis" || page === "dictation") {
+      const { mountInputLab } = await import("./input-lab.js");
+      if (run === version)
+        dispose = mountInputLab(main, {
+          mode: page,
+          week,
+          question: /^q\d+$/.test(b || "") ? Number(b.slice(1)) - 1 : undefined,
+          attemptKey: attemptId ? decodeURIComponent(attemptId) : undefined,
+          track: curTrack(),
+          onNavigate: nav,
+        });
+      return;
+    }
+    if (page === "writing" || page === "speaking") {
+      const { mountOutputLab } = await import("./output-lab.js");
+      if (run === version)
+        dispose = mountOutputLab(main, {
+          mode: page,
+          week,
+          topic: b,
+          track: curTrack(),
+          onNavigate: nav,
+        });
+      return;
+    }
+    if (page === "accuracy") {
+      const { mountGrammarRoom } = await import("./advanced-grammar.js");
+      if (run === version)
+        dispose = mountGrammarRoom(main, { unit: a, onNavigate: nav });
+      return;
+    }
+    if (page === "day") {
+      dispose = mountStudyDay(main, cleanDay(a));
+      return;
+    }
+    if (page === "mistakes") {
+      main.innerHTML =
+        mistakesHtml() +
+        '<p><a class="miniAction" href="#/review">打开基础词汇与语法复习本 →</a></p>';
+      return;
+    }
     if (page === "learn") {
       dispose = mountPlayer(main, {
         day: cleanDay(a),
@@ -607,13 +557,17 @@ async function render() {
           ? subject(a, b) + resourcePanel(a)
           : page === "report"
             ? report()
-            : page === "day"
-              ? dayPage(a)
-              : dash();
+            : deskHtml();
     if (page === "report") {
       main
         .querySelector(".column")
-        ?.insertAdjacentHTML("afterbegin", skillsPanel(state(), getDay));
+        ?.insertAdjacentHTML(
+          "afterbegin",
+          labReportHtml() +
+            '<details class="panel panelBody"><summary>基础补练诊断及模拟考记录</summary>' +
+            skillsPanel(state(), getDay) +
+            "</details>",
+        );
       dispose = bindEvidence(main);
     }
   } catch (error) {

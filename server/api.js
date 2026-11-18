@@ -14,6 +14,8 @@ const providerConfig = {
 };
 
 const instructions = {
+  reading:
+    "结合本题英文证据，用中文解释题干改写、干扰项和学习者答案，给出可在下一段文章中复用的判断步骤。若是 Not Given，说明现有信息无法推出哪个结论。",
   vocabulary:
     "用中文解释学习者给出的英文词义、搭配或选词错误，引用学习者原句，给一个职场例句，最后留一个换场景的小题。",
   grammar:

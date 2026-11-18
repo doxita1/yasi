@@ -1,11 +1,15 @@
-import { mkdir, cp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, cp, readFile, writeFile, rm } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 const root = fileURLToPath(new URL("../", import.meta.url)),
   at = (...parts) => path.join(root, ...parts);
 await mkdir(at("dist", "server"), { recursive: true });
 await mkdir(at("dist", ".openai"), { recursive: true });
-await cp(at("public"), at("dist", "client"), { recursive: true });
+const client = at("dist", "client");
+if (path.relative(root, client) !== path.join("dist", "client"))
+  throw Error("Unexpected build path");
+await rm(client, { recursive: true, force: true });
+await cp(at("public"), client, { recursive: true });
 await cp(at(".openai", "hosting.json"), at("dist", ".openai", "hosting.json"));
 await cp(at("drizzle"), at("dist", ".openai", "drizzle"), { recursive: true });
 const api = await readFile(at("server", "api.js"), "utf8");

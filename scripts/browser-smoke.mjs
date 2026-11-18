@@ -115,14 +115,17 @@ try {
     throw Error("Lesson did not finish");
   }
   await open(p);
-  assert.equal(await p.getByRole("heading", { name: "学习工作台" }).count(), 1);
+  assert.equal(
+    await p.getByRole("heading", { name: "雅思备考工作台" }).count(),
+    1,
+  );
   const screenshotRoot = process.env.YASI_QA_SHOTS;
   if (screenshotRoot)
     await p.screenshot({
       path: path.join(screenshotRoot, "desktop.png"),
       fullPage: true,
     });
-  await p.locator(".heroActions a").first().click();
+  await open(p, "learn/1/vocab");
   await p.locator("[data-opt]").first().click();
   await p.locator("[data-act=check]").click();
   await p.locator("[data-act=next]").click();
@@ -139,6 +142,7 @@ try {
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   );
+  await m.locator("#main details summary").click();
   await m.locator('a[href="#/learn/2/work"]').click();
   await m.locator("[data-act=record]").first().click();
   await m.waitForFunction(() =>
@@ -150,11 +154,12 @@ try {
   await complete(m);
   await flush(m);
   await open(p);
-  await p.locator(".heroActions a").first().click();
+  await p.locator('a.resumeItem[href="#/learn/1/vocab"]').click();
   assert.match(await p.locator(".ep-counter").innerText(), /第 2\s*\//);
   await complete(p);
   await flush(p);
   await open(p, "day/2");
+  await p.locator("#main details summary").click();
   assert.match(
     await p.locator('a[href="#/learn/2/work"]').innerText(),
     /已完成/,
@@ -193,7 +198,7 @@ try {
     await m
       .locator(".heroActions")
       .innerText()
-      .then((s) => s.includes("开始今天")),
+      .then((s) => s.includes("开始限时阅读")),
   );
   await open(p, "settings");
   await p.locator("[name=provider]").waitFor();
@@ -233,6 +238,12 @@ try {
     ),
   );
   await (await import("./mocks-browser.mjs")).verifyMockFlow(p, base);
+  await (
+    await import("./exam-level-browser.mjs")
+  ).verifyReadingFlow(p, m, base);
+  await (await import("./output-browser.mjs")).verifyOutputLabFlow(p, base);
+  await (await import("./input-browser-flows.mjs")).smokeInputRoutes(p, base);
+  await (await import("./materials-browser.mjs")).verifyMaterialsFlow(p, base);
   assert.deepEqual(errors, []);
   console.log(
     "PASS · desktop/mobile resume, future day, core practice without AI, microphone upload, decoded lesson audio, two-account isolation, conflict drafts, 26-week library.",

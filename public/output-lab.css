@@ -1,0 +1,303 @@
+.ol-root {
+  --ol-dark: #1f4938;
+  --ol-rule: #d9e0d1;
+  --ol-muted: #596958;
+  --ol-bg: #fefffa;
+  max-width: 1380px;
+  color: #213529;
+}
+.ol-map {
+  margin: 16px 0;
+}
+.ol-map figcaption {
+  font-size: 0.82rem;
+  color: var(--ol-muted);
+}
+.ol-plan {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px;
+}
+.ol-plan span {
+  display: grid;
+  place-items: center;
+  min-height: 50px;
+  padding: 4px;
+  background: #edf2e5;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.ol-plan span:nth-child(5) {
+  background: #cfdfc4;
+}
+.ol-map .ol-dual {
+  grid-template-columns: repeat(auto-fit, minmax(min(195px, 100%), 1fr));
+}
+.ol-head,
+.ol-clockrow,
+.ol-actions,
+.ol-sub,
+.ol-selects,
+.ol-sources {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ol-head {
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 3px 0 16px;
+  border-bottom: 1px solid var(--ol-rule);
+}
+.ol-head h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(27px, 3vw, 41px);
+  letter-spacing: -0.055em;
+}
+.ol-head p,
+.ol-qnote {
+  margin: 0;
+  color: var(--ol-muted);
+}
+.ol-label {
+  color: #647b55 !important;
+  letter-spacing: 0.075em;
+  font-weight: 700;
+  font-size: 0.8rem;
+  margin: 0;
+}
+.ol-selects {
+  align-items: flex-end;
+}
+.ol-root label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.ol-selects select {
+  min-width: 120px;
+  max-width: min(275px, 82vw);
+}
+.ol-columns,
+.ol-dual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.ol-stack {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.ol-panel,
+.ol-details {
+  border: 1px solid var(--ol-rule);
+  background: var(--ol-bg);
+  border-radius: 12px;
+  padding: clamp(16px, 2vw, 25px);
+  min-width: 0;
+}
+.ol-panel h2,
+.ol-panel h3,
+.ol-details h4 {
+  margin: 6px 0 12px;
+  line-height: 1.3;
+}
+.ol-panel h2 {
+  font-size: clamp(19px, 2vw, 26px);
+}
+.ol-question,
+.ol-example p[lang="en"],
+.ol-copy[lang="en"],
+.ol-dual p[lang="en"] {
+  font:
+    1.07rem/1.65 Georgia,
+    "Times New Roman",
+    serif;
+  color: #24352b;
+}
+.ol-question p,
+.ol-copy p {
+  white-space: pre-wrap;
+}
+.ol-root ol {
+  padding-left: 1.5em;
+}
+.ol-root li + li {
+  margin-top: 6px;
+}
+.ol-details summary {
+  cursor: pointer;
+  color: var(--ol-dark);
+  font-weight: 700;
+}
+.ol-details[open] summary {
+  margin-bottom: 13px;
+}
+.ol-example + .ol-example {
+  padding-top: 10px;
+  border-top: 1px solid var(--ol-rule);
+}
+.ol-example small,
+.ol-check small,
+.ol-muted,
+.ol-sub,
+.ol-panel small {
+  color: var(--ol-muted);
+  line-height: 1.55;
+}
+.ol-check {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 9px !important;
+  padding: 11px 0;
+  border-top: 1px solid var(--ol-rule);
+}
+.ol-check input {
+  margin-top: 4px;
+  accent-color: var(--ol-dark);
+}
+.ol-check b,
+.ol-check small {
+  display: block;
+}
+.ol-check small {
+  font-weight: 400;
+}
+.ol-button,
+.ol-root select {
+  border: 1px solid #a9b7a6;
+  background: #fff;
+  color: var(--ol-dark);
+  padding: 8px 13px;
+  min-height: 38px;
+  border-radius: 7px;
+  font-size: 0.88rem;
+}
+.ol-button:hover {
+  background: #f0f4e9;
+}
+.ol-emphasis,
+.ol-emphasis:hover {
+  background: var(--ol-dark);
+  color: white;
+  border-color: var(--ol-dark);
+}
+.ol-actions {
+  margin: 4px 0 12px;
+}
+.ol-clockrow,
+.ol-sub {
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.ol-clockrow span {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.08rem;
+}
+.ol-root textarea {
+  width: 100%;
+  font: 1rem/1.65 inherit;
+  line-height: 1.65;
+  border: 1px solid #a9b7a6;
+  border-radius: 8px;
+  padding: 12px;
+  color: inherit;
+  background: white;
+  resize: vertical;
+  margin-bottom: 6px;
+}
+.ol-sub,
+.ol-sources {
+  font-size: 0.81rem;
+}
+.ol-sources {
+  margin: 22px 0;
+  color: #59704d;
+}
+.ol-sources a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ol-dual {
+  gap: 10px;
+}
+.ol-dual article,
+.ol-conflict {
+  padding: 11px;
+  background: #f3f5ed;
+  border-radius: 7px;
+  overflow-wrap: anywhere;
+}
+.ol-clips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+.ol-table {
+  overflow-x: auto;
+}
+.ol-table table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.87rem;
+}
+.ol-table caption {
+  text-align: left;
+  padding: 4px 0 8px;
+  color: var(--ol-muted);
+}
+.ol-table th,
+.ol-table td {
+  padding: 9px 7px;
+  border-bottom: 1px solid var(--ol-rule);
+  text-align: left;
+}
+.ol-table th {
+  background: #eef3e7;
+}
+.ol-parts {
+  margin-top: 18px;
+}
+.ol-root [data-ol-status] {
+  color: #365b31;
+  min-height: 1em;
+  font-size: 0.9rem;
+}
+.ol-root textarea[lang="en"] {
+  font-family: Georgia, "Times New Roman", serif;
+}
+@media (max-width: 900px) {
+  .ol-columns {
+    grid-template-columns: 1fr;
+  }
+  .ol-head {
+    align-items: flex-start;
+  }
+  .ol-selects {
+    width: 100%;
+  }
+  .ol-dual {
+    grid-template-columns: repeat(auto-fit, minmax(min(185px, 100%), 1fr));
+  }
+}
+@media (max-width: 440px) {
+  .ol-selects,
+  .ol-selects label {
+    width: 100%;
+  }
+  .ol-selects select {
+    max-width: none;
+    width: 100%;
+  }
+  .ol-button {
+    min-height: 42px;
+  }
+}

@@ -1251,8 +1251,9 @@ export function mountReview(container, { onNavigate, onUpdate } = {}) {
   function entries() {
     if (filter === "deferred") return listDeferredWords();
     return filter === "due"
-      ? listDueReviews()
+      ? listDueReviews().filter((x) => !x.labRoute)
       : Object.entries(getState().review)
+          .filter(([, x]) => !x.labRoute)
           .map(([key, v]) => ({ ...v, key }))
           .sort((a, b) =>
             String(a.due || "").localeCompare(String(b.due || "")),
@@ -1272,8 +1273,10 @@ export function mountReview(container, { onNavigate, onUpdate } = {}) {
             .includes(query.toLowerCase()),
         ),
     );
-    const total = Object.keys(getState().review).length,
-      due = listDueReviews().length;
+    const total = Object.values(getState().review).filter(
+        (x) => !x.labRoute,
+      ).length,
+      due = listDueReviews().filter((x) => !x.labRoute).length;
     if (target) {
       const w = findTarget();
       if (!w) {
