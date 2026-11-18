@@ -26,11 +26,11 @@ const messages = {
     "该模型 ID 不存在或当前项目未获访问权。请填写项目可用的模型 ID 后测试该档模型。",
   upstream_request: "服务商拒绝了请求参数。请确认所选模型支持 Responses 接口。",
   upstream_service: "服务商暂时无法处理请求，请稍后重试。",
-  provider_unreachable:
-    "学习室服务端未连接到服务商。请检查网络可达性，本机预览和云端使用各自的网络。",
+  provider_unreachable: "学习室服务端与服务商的连接中断。",
+  upstream_redirect: "服务商接口返回了跳转，学习室已停止请求。",
   probe_gateway:
     "收到网关或非 API 响应，尚未确认学习室服务端能访问 OpenAI API。",
-  upstream_timeout: "请求模型超时。可稍后重试或选择响应更快的模型。",
+  upstream_timeout: "等待服务商响应超时。可稍后重试。",
   provider_rejected: "服务商未接受请求，请检查所选模型、项目权限及账单。",
   invalid_provider_response: "服务商返回的内容无法解析，请稍后重试。",
   empty_provider_response:
@@ -39,6 +39,58 @@ const messages = {
     "已收到模型回复，但示例句缺少预期的主谓一致修正或中文解释。请重试该档模型。",
   service_unavailable: "本站服务端暂不可用，请稍后重试。",
 };
+
+export function isLocalPreview(hostname = globalThis.location?.hostname) {
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(hostname);
+}
+
+const stages = {
+  response_headers: "等待响应头",
+  response_body: "读取响应正文",
+};
+
+function connectionMessage(body) {
+  if (!body) return "";
+  const local = isLocalPreview();
+  const host = local ? "本机预览" : "云端学习室";
+  if (body.stage === "request_setup")
+    return (
+      host +
+      "在准备请求时出错，尚未向服务商发送。" +
+      (local
+        ? "请检查本机启动器输出和 Node.js 版本。"
+        : "请站点所有者检查云端服务的运行日志和运行时版本。")
+    );
+  const networkAdvice = local
+    ? "请检查这台电脑的网络和代理设置，代理变更后重启本机学习室。"
+    : "可稍后再试。若持续出现，请站点所有者检查云端服务的出站连接。";
+  const reasons = {
+    connection_reset: "与服务商的连接被重置。" + networkAdvice,
+    dns: "域名解析失败。" + networkAdvice,
+    tls: "无法验证或建立加密连接。" + networkAdvice,
+    timeout: "等待服务商响应超时。可稍后再试。",
+    network: "网络传输失败。" + networkAdvice,
+    redirect:
+      messages.upstream_redirect +
+      (local
+        ? "请检查这台电脑的代理是否把 API 请求转向登录页或其他地址。"
+        : "请站点所有者检查云端网关是否把 API 请求转向其他地址。"),
+  };
+  const stage = Object.hasOwn(stages, body.stage) ? stages[body.stage] : "";
+  const reason = Object.hasOwn(reasons, body.reason)
+    ? reasons[body.reason]
+    : "";
+  const legacyNetwork = body.error === "provider_unreachable";
+  if (
+    !reason &&
+    !legacyNetwork &&
+    !(stage && Object.hasOwn(messages, body.error))
+  )
+    return "";
+  const hint =
+    reason || messages[body.error] + (legacyNetwork ? networkAdvice : "");
+  return host + (stage ? " · " + stage : "") + "。" + hint;
+}
 
 export function aiErrorText(error) {
   return error?.aiMessage || "未能连接学习室服务端，请检查当前网络和登录状态。";
@@ -79,6 +131,7 @@ export async function aiResponse(response) {
           "），请检查网络或稍后再试。";
   const text =
     (context ? context + "。 " : "") +
-    (Object.hasOwn(messages, body?.error) ? messages[body.error] : fallback);
+    (connectionMessage(body) ||
+      (Object.hasOwn(messages, body?.error) ? messages[body.error] : fallback));
   throw Object.assign(new Error(text), { aiMessage: text });
 }

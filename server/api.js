@@ -538,7 +538,7 @@ function validateProviderKey(provider, key) {
     fail(400, "provider_key_mismatch");
 }
 
-function rejectProvider(status, error, provider, model) {
+function rejectProvider(status, error, provider, model, details = {}) {
   // Upstream message strings can contain fragments of credentials. Return only our codes.
   const signature = [error?.code, error?.type]
     .filter((part) => typeof part === "string")
@@ -575,56 +575,132 @@ function rejectProvider(status, error, provider, model) {
   else if (status === 408 || status === 504) code = "upstream_timeout";
   else if (status >= 500) code = "upstream_service";
   else code = "provider_rejected";
-  fail(502, code, { providerStatus: status, provider, model });
+  fail(502, code, { providerStatus: status, provider, model, ...details });
 }
-async function checkOpenAINetwork() {
-  // This probe never reads saved settings and only retries the uncredentialed model-list GET.
-  let response;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      response = await fetch("https://api.openai.com/v1/models", {
-        method: "GET",
-        headers: { Accept: "application/json" },
-        redirect: "error",
-        signal: AbortSignal.timeout(6000),
-      });
-      break;
-    } catch (error) {
-      if (attempt === 1)
-        fail(
-          502,
-          ["TimeoutError", "AbortError"].includes(error?.name)
-            ? "upstream_timeout"
-            : "provider_unreachable",
-          { provider: "openai" },
-        );
-    }
-  }
-  const content = await response.json().catch(() => null);
+function transportFailure(error, stage, details) {
+  const codes = [
+    error,
+    error?.cause,
+    ...(Array.isArray(error?.cause?.errors) ? error.cause.errors : []),
+  ]
+    .filter(Boolean)
+    .flatMap((item) => [item.name, item.code])
+    .filter((item) => typeof item === "string");
+  let reason = "network";
   if (
-    /unsupported_country|country.*not_supported|region.*not_supported/i.test(
-      content?.error?.code || "",
+    codes.some((code) =>
+      /^(TimeoutError|AbortError|ETIMEDOUT|UND_ERR_(CONNECT|HEADERS|BODY)_TIMEOUT)$/.test(
+        code,
+      ),
     )
   )
-    fail(502, "upstream_region", {
-      provider: "openai",
-      providerStatus: response.status,
-    });
-  if (
-    (response.status === 401 && content?.error) ||
-    (response.ok && Array.isArray(content?.data))
+    reason = "timeout";
+  else if (
+    codes.some((code) => /^(ECONNRESET|EPIPE|UND_ERR_SOCKET)$/.test(code))
   )
-    return json({
-      reachable: true,
-      provider: "openai",
+    reason = "connection_reset";
+  else if (codes.some((code) => /^(ENOTFOUND|EAI_AGAIN)$/.test(code)))
+    reason = "dns";
+  else if (
+    codes.some((code) =>
+      /^(ERR_TLS_|ERR_SSL_|CERT_|UNABLE_TO_VERIFY_|UNABLE_TO_GET_ISSUER|DEPTH_ZERO_SELF_SIGNED_CERT|SELF_SIGNED_CERT)/.test(
+        code,
+      ),
+    )
+  )
+    reason = "tls";
+  return new RequestError(
+    502,
+    reason === "timeout" ? "upstream_timeout" : "provider_unreachable",
+    { ...details, stage, reason },
+  );
+}
+async function postToProvider(url, headers, payload, timeoutMs, details) {
+  let request;
+  try {
+    request = new Request(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    throw transportFailure(error, "request_setup", details);
+  }
+  let response;
+  try {
+    response = await fetch(request);
+  } catch (error) {
+    throw transportFailure(error, "response_headers", details);
+  }
+  if (response.status >= 300 && response.status < 400) {
+    response.body?.cancel().catch(() => {});
+    fail(502, "upstream_redirect", {
+      ...details,
+      providerStatus: response.status,
+      stage: "response_headers",
+      reason: "redirect",
+    });
+  }
+  let text;
+  try {
+    text = await response.text();
+  } catch (error) {
+    throw transportFailure(error, "response_body", {
+      ...details,
       providerStatus: response.status,
     });
-  if (!content?.error || response.status === 403)
-    fail(502, "probe_gateway", {
-      provider: "openai",
-      providerStatus: response.status,
+  }
+  let content = null;
+  try {
+    content = JSON.parse(text);
+  } catch {
+    // Non-JSON gateway responses are classified by the caller using the HTTP status.
+  }
+  return { response, content };
+}
+export async function checkOpenAINetwork() {
+  const provider = "openai";
+  for (let attempts = 1; attempts <= 2; attempts++) {
+    let result;
+    try {
+      result = await postToProvider(
+        providerConfig.openai.url,
+        { Accept: "application/json", "Content-Type": "application/json" },
+        {},
+        6000,
+        { provider, attempts },
+      );
+    } catch (error) {
+      if (
+        attempts === 1 &&
+        error.details?.stage !== "request_setup" &&
+        ["upstream_timeout", "provider_unreachable"].includes(error.message)
+      )
+        continue;
+      throw error;
+    }
+    const { response, content } = result;
+    const details = { provider, providerStatus: response.status, attempts };
+    if (
+      /unsupported_country|country.*not_supported|region.*not_supported/i.test(
+        content?.error?.code || "",
+      )
+    )
+      fail(502, "upstream_region", details);
+    if (
+      response.status === 401 &&
+      content?.error &&
+      typeof content.error === "object"
+    )
+      return json({ reachable: true, ...details });
+    if (!content?.error || response.status === 403 || response.ok)
+      fail(502, "probe_gateway", details);
+    rejectProvider(response.status, content.error, provider, undefined, {
+      attempts,
     });
-  rejectProvider(response.status, content.error, "openai");
+  }
 }
 async function coach(request, env, user, testing) {
   const data = await body(request);
@@ -670,40 +746,30 @@ async function coach(request, env, user, testing) {
       content: "练习背景或此前对话：\n" + context,
     });
   messages.push({ role: "user", content: input });
-  let response;
-  try {
-    response = await fetch(providerConfig[provider].url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + apiKey,
-      },
-      body: JSON.stringify({
-        model,
-        input: messages,
-        store: false,
-        max_output_tokens: testing ? 1800 : 3500,
-      }),
-      signal: AbortSignal.timeout(55000),
-      redirect: "error",
-    });
-  } catch (error) {
-    const timeout = ["TimeoutError", "AbortError"].includes(error?.name);
-    fail(502, timeout ? "upstream_timeout" : "provider_unreachable", {
+  const { response, content: result } = await postToProvider(
+    providerConfig[provider].url,
+    {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + apiKey,
+    },
+    {
+      model,
+      input: messages,
+      store: false,
+      max_output_tokens: testing ? 1800 : 3500,
+    },
+    55000,
+    { provider, model },
+  );
+  if (!response.ok)
+    rejectProvider(response.status, result?.error, provider, model);
+  if (!result || typeof result !== "object")
+    fail(502, "invalid_provider_response", {
       provider,
       model,
+      providerStatus: response.status,
+      stage: "response_body",
     });
-  }
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    rejectProvider(response.status, body?.error, provider, model);
-  }
-  let result;
-  try {
-    result = await response.json();
-  } catch {
-    fail(502, "invalid_provider_response");
-  }
   const text =
     result?.output_text?.trim?.() ||
     (Array.isArray(result?.output) ? result.output : [])

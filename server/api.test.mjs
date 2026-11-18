@@ -212,9 +212,14 @@ test("audio sync stores immutable user-scoped objects and only serves supported 
 test("both AI providers use encrypted account-scoped keys, preserve settings, and return actual exercise feedback", async (t) => {
   const { call, sql } = fixture();
   const seen = [];
-  t.mock.method(globalThis, "fetch", async (url, req) => {
-    const data = JSON.parse(req.body);
-    seen.push({ url, data, authorization: req.headers.Authorization });
+  t.mock.method(globalThis, "fetch", async (req) => {
+    assert.equal(req.redirect, "manual");
+    const data = await req.json();
+    seen.push({
+      url: req.url,
+      data,
+      authorization: req.headers.get("authorization"),
+    });
     assert.equal(data.store, false);
     const prompt = data.input.at(-1).content;
     const text = prompt.includes("She go")
@@ -334,8 +339,9 @@ test("model diagnostics distinguish billing, permissions, errors, timeouts and a
   });
   let reply;
   const calls = [];
-  t.mock.method(globalThis, "fetch", async (url, req) => {
-    calls.push(JSON.parse(req.body).model);
+  t.mock.method(globalThis, "fetch", async (req) => {
+    assert.equal(req.redirect, "manual");
+    calls.push((await req.json()).model);
     if (reply instanceof Error) throw reply;
     return reply;
   });
@@ -366,16 +372,64 @@ test("model diagnostics distinguish billing, permissions, errors, timeouts and a
     });
     assert.equal(calls.at(-1), deepModel);
   }
-  for (const [error, expected] of [
-    [new TypeError("connection reset"), "provider_unreachable"],
-    [new DOMException("timeout", "TimeoutError"), "upstream_timeout"],
+  const networkFailure = (code) =>
+    new TypeError("private transport details", {
+      cause: Object.assign(new Error("private socket details"), { code }),
+    });
+  for (const [error, expected, reason] of [
+    [networkFailure("ECONNRESET"), "provider_unreachable", "connection_reset"],
+    [networkFailure("ENOTFOUND"), "provider_unreachable", "dns"],
+    [networkFailure("CERT_HAS_EXPIRED"), "provider_unreachable", "tls"],
+    [
+      networkFailure("PRIVATE_ADAPTER_FAULT"),
+      "provider_unreachable",
+      "network",
+    ],
+    [
+      new DOMException("private timeout", "TimeoutError"),
+      "upstream_timeout",
+      "timeout",
+    ],
   ]) {
     reply = error;
-    assert.equal(
-      (await (await call("ai/test", "POST", { provider })).json()).error,
-      expected,
-    );
+    for (const [depth, expectedModel] of [
+      ["daily", model],
+      ["deep", deepModel],
+    ]) {
+      const previousCalls = calls.length;
+      const result = await (
+        await call("ai/test", "POST", { provider, depth })
+      ).json();
+      assert.equal(calls.length, previousCalls + 1);
+      assert.equal(result.error, expected);
+      assert.equal(result.model, expectedModel);
+      assert.equal(result.provider, provider);
+      assert.equal(result.stage, "response_headers");
+      assert.equal(result.reason, reason);
+      assert.doesNotMatch(
+        JSON.stringify(result),
+        /private|fictional-key|ECONNRESET|ENOTFOUND|CERT_HAS_EXPIRED/i,
+      );
+    }
   }
+  reply = new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.error(networkFailure("ECONNRESET"));
+      },
+    }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+  const previousCalls = calls.length;
+  const brokenBody = await (await call("ai/test", "POST", { provider })).json();
+  assert.equal(calls.length, previousCalls + 1);
+  assert.equal(brokenBody.stage, "response_body");
+  assert.equal(brokenBody.reason, "connection_reset");
+  assert.doesNotMatch(JSON.stringify(brokenBody), /private|fictional-key/);
+  reply = new Response("<html>private upstream page</html>", { status: 200 });
+  const invalid = await (await call("ai/test", "POST", { provider })).json();
+  assert.equal(invalid.error, "invalid_provider_response");
+  assert.doesNotMatch(JSON.stringify(invalid), /private/);
   reply = Response.json({ output_text: "goes" });
   assert.equal(
     (await (await call("ai/test", "POST", { provider })).json()).error,
@@ -438,19 +492,22 @@ test("a misplaced provider credential is rejected before storage or transmission
   );
   assert.equal(fetcher.mock.callCount(), 0);
 });
-test("network diagnostics perform only anonymous fixed model-list GETs and retry a transient connection failure once", async (t) => {
+test("network diagnostics post anonymously to the fixed Responses endpoint and retry one transport failure", async (t) => {
   const { call } = fixture(),
     answers = [];
   const probe = () => call("ai/network", "POST", undefined);
-  const traffic = t.mock.method(globalThis, "fetch", async (url, req) => {
-    assert.equal(url, "https://api.openai.com/v1/models");
-    assert.equal(req.method, "GET");
+  const traffic = t.mock.method(globalThis, "fetch", async (req) => {
+    assert.equal(req.url, "https://api.openai.com/v1/responses");
+    assert.equal(req.method, "POST");
     assert.deepEqual(
       [...new Headers(req.headers)],
-      [["accept", "application/json"]],
+      [
+        ["accept", "application/json"],
+        ["content-type", "application/json"],
+      ],
     );
-    assert.equal(req.body, undefined);
-    assert.equal(req.redirect, "error");
+    assert.equal(await req.text(), "{}");
+    assert.equal(req.redirect, "manual");
     assert.ok(req.signal instanceof AbortSignal);
     const next = answers.shift();
     if (next instanceof Error) throw next;
@@ -458,14 +515,26 @@ test("network diagnostics perform only anonymous fixed model-list GETs and retry
   });
   assert.equal((await call("ai/network", "POST", undefined, "")).status, 401);
   assert.equal(traffic.mock.callCount(), 0);
+  const authChallenge = () =>
+    Response.json({ error: { code: "missing_api_key" } }, { status: 401 });
+  answers.push(authChallenge());
+  assert.deepEqual(await (await probe()).json(), {
+    provider: "openai",
+    providerStatus: 401,
+    reachable: true,
+    attempts: 1,
+  });
   answers.push(
-    new TypeError("private transport details"),
-    Response.json({ error: { code: "missing_api_key" } }, { status: 401 }),
+    new TypeError("private transport details", {
+      cause: Object.assign(new Error(), { code: "ECONNRESET" }),
+    }),
+    authChallenge(),
   );
   assert.deepEqual(await (await probe()).json(), {
     provider: "openai",
     providerStatus: 401,
     reachable: true,
+    attempts: 2,
   });
   answers.push(
     Response.json(
@@ -478,26 +547,92 @@ test("network diagnostics perform only anonymous fixed model-list GETs and retry
       { status: 403 },
     ),
   );
-  assert.deepEqual(await (await probe()).json(), {
-    provider: "openai",
-    providerStatus: 403,
-    error: "upstream_region",
-  });
+  const region = await (await probe()).json();
+  assert.equal(region.provider, "openai");
+  assert.equal(region.providerStatus, 403);
+  assert.equal(region.error, "upstream_region");
+  assert.doesNotMatch(JSON.stringify(region), /private/);
   answers.push(
     new Response("<html>private gateway details</html>", { status: 403 }),
   );
-  assert.deepEqual(await (await probe()).json(), {
-    provider: "openai",
-    providerStatus: 403,
-    error: "probe_gateway",
-  });
+  const gateway = await (await probe()).json();
+  assert.equal(gateway.provider, "openai");
+  assert.equal(gateway.providerStatus, 403);
+  assert.equal(gateway.error, "probe_gateway");
+  assert.doesNotMatch(JSON.stringify(gateway), /private/);
   answers.push(
     new DOMException("private timeout", "TimeoutError"),
     new DOMException("private timeout", "TimeoutError"),
   );
-  assert.deepEqual(await (await probe()).json(), {
+  const timeout = await (await probe()).json();
+  assert.equal(timeout.provider, "openai");
+  assert.equal(timeout.error, "upstream_timeout");
+  assert.equal(timeout.stage, "response_headers");
+  assert.equal(timeout.reason, "timeout");
+  assert.equal(timeout.attempts, 2);
+  assert.doesNotMatch(JSON.stringify(timeout), /private/);
+  assert.equal(traffic.mock.callCount(), 7);
+});
+
+test("anonymous probes and authenticated requests reject every redirect without following or retrying", async (t) => {
+  const { call } = fixture();
+  await call("ai/settings", "PUT", {
     provider: "openai",
-    error: "upstream_timeout",
+    apiKey: "fictional-redirect-key",
   });
-  assert.equal(traffic.mock.callCount(), 6);
+  let status;
+  const traffic = t.mock.method(globalThis, "fetch", async (request) => {
+    assert.equal(request.redirect, "manual");
+    assert.equal(request.url, "https://api.openai.com/v1/responses");
+    return new Response(null, {
+      status,
+      headers: { Location: "https://private.invalid/location" },
+    });
+  });
+  for (status of [300, 301, 302, 303, 304, 307, 308]) {
+    for (const route of ["ai/network", "ai/test"]) {
+      const before = traffic.mock.callCount();
+      const response = await call(route, "POST", { provider: "openai" });
+      const data = await response.json();
+      assert.equal(response.status, 502);
+      assert.equal(data.error, "upstream_redirect");
+      assert.equal(data.stage, "response_headers");
+      assert.equal(data.reason, "redirect");
+      assert.equal(data.providerStatus, status);
+      assert.equal(traffic.mock.callCount(), before + 1);
+      assert.doesNotMatch(
+        JSON.stringify(data),
+        /private|fictional-redirect-key/,
+      );
+    }
+  }
+});
+
+test("unsupported request initialization is reported before reaching the provider", async (t) => {
+  const { call } = fixture();
+  const provider = "openai";
+  await call("ai/settings", "PUT", { provider, apiKey: "fictional-setup-key" });
+  const NativeRequest = globalThis.Request;
+  t.mock.method(
+    globalThis,
+    "Request",
+    class extends NativeRequest {
+      constructor(input, init) {
+        super(input, init);
+        if (this.url === "https://api.openai.com/v1/responses")
+          throw new TypeError("private runtime error");
+      }
+    },
+  );
+  const fetcher = t.mock.method(globalThis, "fetch", () => {
+    throw new Error("unexpected transmission");
+  });
+  for (const path of ["ai/network", "ai/test"]) {
+    const response = await call(path, "POST", { provider });
+    const data = await response.json();
+    assert.equal(response.status, 502);
+    assert.equal(data.stage, "request_setup");
+    assert.doesNotMatch(JSON.stringify(data), /private|fictional-setup-key/);
+  }
+  assert.equal(fetcher.mock.callCount(), 0);
 });

@@ -90,6 +90,7 @@ test(
     assert.equal(code, 1);
     assert.deepEqual(requests, [
       { destination: "api.openai.com:443", auth: undefined },
+      { destination: "api.openai.com:443", auth: undefined },
     ]);
   },
 );

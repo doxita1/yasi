@@ -21,6 +21,22 @@ export async function verifyAiSettings(page, base) {
     },
   };
   const calls = [];
+  const probeResults = [
+    { reachable: true, providerStatus: 401, attempts: 2 },
+    {
+      error: "provider_unreachable",
+      provider: "openai",
+      stage: "response_headers",
+      reason: "connection_reset",
+    },
+    {
+      error: "upstream_redirect",
+      provider: "openai",
+      providerStatus: 307,
+      stage: "response_headers",
+      reason: "redirect",
+    },
+  ];
   const pattern = "**/api/ai/**";
   const output = page.locator("#aiForm output");
   await page.route(pattern, async (route) => {
@@ -29,8 +45,11 @@ export async function verifyAiSettings(page, base) {
     let status = 200,
       body = settings;
     if (path === "/api/ai/network") {
+      assert.equal(req.method(), "POST");
       assert.equal(req.postData(), null);
-      body = { reachable: true, providerStatus: 401 };
+      body = probeResults.shift();
+      assert.ok(body, "unexpected extra network probe");
+      status = body.error ? 502 : 200;
     } else if (req.method() !== "GET") {
       const data = req.postDataJSON(),
         provider = data.provider;
@@ -73,7 +92,24 @@ export async function verifyAiSettings(page, base) {
         .querySelector("#aiForm output")
         ?.textContent.includes("网络可达"),
     );
-    assert.match(await output.innerText(), /401/);
+    assert.match(
+      await output.innerText(),
+      /本机预览网络可达.*POST \/v1\/responses.*401.*第二次尝试/,
+    );
+    assert.match(await output.innerText(), /测试日常模型/);
+    await page.locator("[data-action=network]").click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector("#aiForm output")
+        ?.textContent.includes("连接被重置"),
+    );
+    assert.match(await output.innerText(), /本机预览.*等待响应头.*代理/);
+    await page.locator("[data-action=network]").click();
+    await page.waitForFunction(() =>
+      document.querySelector("#aiForm output")?.textContent.includes("跳转"),
+    );
+    assert.match(await output.innerText(), /307.*已停止请求.*代理/);
+    assert.equal(probeResults.length, 0);
     await page.goto(base + "/#/settings");
     await page.waitForFunction(
       () => document.querySelector("#aiForm [name=provider]")?.value === "ark",

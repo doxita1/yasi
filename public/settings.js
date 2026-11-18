@@ -1,7 +1,12 @@
 import { getState, updateProfile } from "./sync.js";
 import { accountFetch as fetch } from "./account-request.js";
 import { esc, icon } from "./icons.js";
-import { aiResponse, aiErrorText, keyInputError } from "./ai-response.js";
+import {
+  aiResponse,
+  aiErrorText,
+  isLocalPreview,
+  keyInputError,
+} from "./ai-response.js";
 const providers = {
   ark: {
     name: "火山方舟 · 豆包",
@@ -116,9 +121,8 @@ export function mountSettings(container, { provider: preferred } = {}) {
     if (!active) return;
     const v = providers[provider],
       stored = cfg?.providers?.[provider];
-    const local = ["localhost", "127.0.0.1", "[::1]"].includes(
-      location.hostname,
-    );
+    const local = isLocalPreview();
+    const host = local ? "本机预览" : "云端学习室";
     node.innerHTML =
       '<form class="goalForm"><p class="pageNote">' +
       (local
@@ -155,7 +159,9 @@ export function mountSettings(container, { provider: preferred } = {}) {
         ? '　<a target="_blank" rel="noreferrer" href="https://platform.openai.com/settings/organization/billing/overview">API 账单 ↗</a>'
         : "") +
       (provider === "openai"
-        ? '<p><button type="button" class="btn" data-action="network">检查网络（免密钥）</button> 仅检查本站到 OpenAI 的连接，无需填写密钥，也不产生模型费用。</p>'
+        ? '<p><button type="button" class="btn" data-action="network">检查网络（免密钥）</button> ' +
+          host +
+          "会匿名访问纠错使用的 <code>POST /v1/responses</code> 接口。无需密钥，不产生模型费用。</p>"
         : "") +
       '</div><div class="inlineBtns"><button class="btn green" type="submit">保存 AI 配置</button><button class="btn" type="button" data-action="test">测试日常模型</button><button class="btn" type="button" data-action="test-deep">测试深度模型</button>' +
       (stored?.configured
@@ -265,13 +271,29 @@ export function mountSettings(container, { provider: preferred } = {}) {
     if (probe)
       probe.onclick = async () => {
         busy(true);
-        out.textContent = "正在检查服务端到 OpenAI 的网络连接…";
+        out.textContent = "正在检查" + host + "到 OpenAI 纠错接口的连接…";
         try {
           const r = await request("ai/network", "POST");
+          if (r.reachable !== true || !Number.isInteger(r.providerStatus)) {
+            out.textContent = "本次检查未能确认网络可达，请稍后再试。";
+            return;
+          }
+          const route = Number.isInteger(r.attempts)
+            ? "OpenAI POST /v1/responses"
+            : "OpenAI API";
+          const retry = r.attempts === 2 ? "，第二次尝试接通" : "";
+          const auth =
+            r.providerStatus === 401 ? "这是匿名请求的预期响应。" : "";
           out.textContent =
-            "网络可达 · OpenAI 模型列表返回 HTTP " +
+            host +
+            "网络可达 · " +
+            route +
+            " 返回 HTTP " +
             r.providerStatus +
-            "。这次只检查网络。密钥与额度可通过日常或深度纠错测试确认。";
+            retry +
+            "。" +
+            auth +
+            "要验证密钥和模型，请选择「测试日常模型」或「测试深度模型」查看实际纠错。";
         } catch (error) {
           out.textContent = aiErrorText(error);
         } finally {

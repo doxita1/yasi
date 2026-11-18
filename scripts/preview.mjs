@@ -6,22 +6,32 @@ import { Readable } from "node:stream";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleApi } from "../server/api.js";
+import { checkOpenAINetwork, handleApi } from "../server/api.js";
 import { startProxyChild } from "./preview-network.mjs";
 const childExit = await startProxyChild();
 if (childExit !== null) process.exit(childExit);
 if (process.argv.includes("--check-openai-network")) {
+  const route = "本机预览 → OpenAI POST /v1/responses（免密钥）";
   try {
-    const result = await fetch("https://api.openai.com/v1/models", {
-      redirect: "error",
-      signal: AbortSignal.timeout(12000),
-    });
-    console.log("OpenAI /v1/models (no key): HTTP " + result.status);
-    await result.body?.cancel();
-    process.exit(result.status === 401 ? 0 : 1);
-  } catch {
+    const response = await checkOpenAINetwork();
+    const { providerStatus, attempts } = await response.json();
+    console.log(
+      route + " HTTP " + providerStatus + "，尝试次数 " + attempts + "。",
+    );
+    process.exit(0);
+  } catch (error) {
+    const details = error.details || {};
+    const summary = [
+      Number.isInteger(error.status) ? error.message : "probe_failed",
+      details.stage,
+      details.reason,
+      Number.isInteger(details.providerStatus) &&
+        "HTTP " + details.providerStatus,
+    ]
+      .filter(Boolean)
+      .join(" · ");
     console.error(
-      "OpenAI /v1/models: no HTTP response. Check the preview server's network and proxy.",
+      route + " " + summary + "。可在本机学习室设置中查看对应处理办法。",
     );
     process.exit(1);
   }
