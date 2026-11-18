@@ -1,0 +1,1 @@
+The bundled 96 English headword pronunciations were synthesized for this project from individual words with Piper's en_GB-alan-medium. The model card credits the Mycroft mimic3 apope_low dataset. Model information and project audio attribution are in [Input Lab audio credits](../input-audio/CREDITS.md).

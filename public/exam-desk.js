@@ -209,6 +209,15 @@ export function deskHtml() {
     button(startRoute, currentLabel, true) +
     button("day/" + Math.min(day + 1, LIMIT), "学习下一天") +
     "</div></div></section>" +
+    '<section class="panel homeWords"><span class="tileIcon vocab">' +
+    icon("words", 22) +
+    '</span><div><h2 class="cardTitle">' +
+    aLink("words", "雅思核心词汇") +
+    '</h2><p>练词义、听音拼写和语境用词。答错的词会进入你的单词错题本。</p><div class="paperOptions">' +
+    button("words/start", "开始练词", true) +
+    aLink("words/errors", "单词错题本 →", "miniAction") +
+    aLink("words/all", "浏览词库 →", "miniAction") +
+    "</div></div></section>" +
     pacingHtml(day, dayPlan(day)) +
     '<div><div class="sectionRow" style="margin-bottom:12px"><h2 class="cardTitle">雅思四科训练</h2>' +
     aLink("mocks", "进入整卷模考 " + icon("right", 14), "miniAction") +
@@ -240,7 +249,7 @@ export function deskHtml() {
     dayPlan(day).name +
     '。进入当天计划查看专项与迁移任务。</p><div class="paperOptions">' +
     button("day/" + day, "打开学习日") +
-    button("lexis", "学术词汇") +
+    button("lexis", "学术搭配") +
     button("accuracy", "语法与改写") +
     button("materials", "资料精练") +
     '</div></section></div><aside class="column"><section class="panel sideCard"><div class="sideCardHead"><h2 class="cardTitle">我的备考记录</h2>' +
@@ -384,7 +393,7 @@ export function mistakesHtml() {
         String(b[1].updatedAt || "").localeCompare(a[1].updatedAt || ""),
       );
   return (
-    '<header class="pageHead"><div><span class="eyebrow">ERROR LOG</span><h1>雅思错题本</h1><p>回到原题检查证据，再用新题验证同一个考点。</p></div></header>' +
+    '<header class="pageHead"><div><span class="eyebrow">ERROR LOG</span><h1>雅思错题本</h1><p>回到原题检查证据，再用新题验证同一个考点。</p></div><a class="btn green" href="#/words/errors">单词错题本 →</a></header>' +
     (items.length
       ? '<div class="rowSet">' +
         items

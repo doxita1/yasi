@@ -1,3 +1,4 @@
+import { aiResponse, aiErrorText } from "./ai-response.js";
 import { esc } from "./icons.js";
 import {
   getState,
@@ -763,16 +764,13 @@ export function mountMocks(container, { onNavigate, track } = {}) {
         }),
         signal: coachController.signal,
       });
-      const result = await r.json();
+      const result = await aiResponse(r);
       if (disposed || serial !== generation) return;
-      if (!r.ok || !result.text) throw Error();
+      if (!result.text) throw Error();
       find("[data-coach]").textContent = result.text;
       announce("AI 参考反馈已返回。");
-    } catch {
-      if (!disposed && serial === generation)
-        announce(
-          "尚未获得反馈。请检查 AI 设置；你仍可用题目下方的要点自行改稿。",
-        );
+    } catch (error) {
+      if (!disposed && serial === generation) announce(aiErrorText(error));
     } finally {
       if (serial === generation) checking = false;
     }

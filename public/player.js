@@ -1,3 +1,4 @@
+import { aiResponse, aiErrorText } from "./ai-response.js";
 import { getDay } from "./curriculum.js";
 import { accountFetch as fetch } from "./account-request.js";
 import {
@@ -975,12 +976,7 @@ export function mountPlayer(
               : "fast",
         }),
       });
-      const result = await r.json().catch(() => ({}));
-      if (!r.ok)
-        throw Object.assign(
-          new Error(result.message || result.error || String(r.status)),
-          { status: r.status },
-        );
+      const result = await aiResponse(r);
       if (disposed || pass !== token) return;
       const feedback = result.text;
       if (!feedback) throw new Error("教练没有返回可读反馈。");
@@ -998,12 +994,7 @@ export function mountPlayer(
       render();
     } catch (err) {
       if (!disposed && token === pass) {
-        const note =
-          err.status === 401
-            ? "登录后可以使用 AI 教练。"
-            : [400, 409, 503, 403].includes(err.status)
-              ? "教练暂不可用。请在模型设置中确认密钥和模型，或先参考本题解析。"
-              : "本次反馈未能返回。你的作答已保存，可以重试。";
+        const note = aiErrorText(err);
         if (reply) msg(note);
         else pane.textContent = note;
       }

@@ -1,6 +1,7 @@
 import { getState, updateProfile } from "./sync.js";
 import { accountFetch as fetch } from "./account-request.js";
 import { esc, icon } from "./icons.js";
+import { aiResponse, aiErrorText, keyInputError } from "./ai-response.js";
 const providers = {
   ark: {
     name: "火山方舟 · 豆包",
@@ -29,16 +30,6 @@ const opt = (value, label, sel) =>
   ">" +
   esc(label) +
   "</option>";
-const msg = {
-  invalid_model: "请输入有效的模型 ID。",
-  invalid_api_key: "请检查 API 密钥格式。",
-  sign_in_required: "请先用受邀账号登录。",
-  provider_not_configured: "请先填写该服务商的 API 密钥并保存。",
-  key_not_configured: "请先保存该服务商的 API 密钥。",
-  vault_unavailable: "服务端密钥暂不可用，当前配置尚未保存。",
-  upstream_auth: "服务商未接受此密钥，请检查配置。",
-  upstream_limit: "服务商已限流或额度不足。",
-};
 async function request(path, method = "GET", data) {
   const response = await fetch("/api/" + path, {
     method,
@@ -47,18 +38,13 @@ async function request(path, method = "GET", data) {
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
   });
-  const body = await response.json();
-  if (!response.ok)
-    throw Error(
-      msg[body.error] ||
-        "操作未完成（" + (body.error || response.status) + "）。",
-    );
-  return body;
+  return aiResponse(response);
 }
-export function mountSettings(container) {
+export function mountSettings(container, { provider: preferred } = {}) {
+  const requested = Object.hasOwn(providers, preferred) ? preferred : null;
   let active = true,
     cfg = null,
-    provider = getState().profile.provider || "ark";
+    provider = requested || getState().profile.provider || "ark";
   const p = getState().profile,
     bands = Array.from({ length: 13 }, (_, i) => 3 + i / 2),
     presets = [15, 20, 30, 45, 60],
@@ -130,8 +116,19 @@ export function mountSettings(container) {
     if (!active) return;
     const v = providers[provider],
       stored = cfg?.providers?.[provider];
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(
+      location.hostname,
+    );
     node.innerHTML =
-      '<form class="goalForm"><label>服务商<select name="provider">' +
+      '<form class="goalForm"><p class="pageNote">' +
+      (local
+        ? "本机预览 · 配置保存在这台电脑的本地学习账号中。使用云端学习室时须在云端账号内配置。"
+        : "云端学习室 · 配置保存在当前登录账号，可跨设备使用。") +
+      "</p><p>当前所选服务商　<b>" +
+      esc(v.name) +
+      "</b>　" +
+      (stored?.configured ? "已保存密钥" : "尚未保存密钥") +
+      '</p><label>服务商<select name="provider">' +
       Object.entries(providers)
         .map(([k, v]) => opt(k, v.name, provider))
         .join("") +
@@ -149,11 +146,18 @@ export function mountSettings(container) {
       (stored?.configured
         ? "已配置 · 留空可保留原密钥"
         : "输入密钥，服务端加密保存") +
-      '"></label><div class="pageNote">测试和 AI 练习按服务商的输入、输出用量计费。ChatGPT 订阅与 API 单独计费。<br><a target="_blank" rel="noreferrer" href="' +
+      '"></label><div hidden><button type="button" class="btn" data-action="switch-openai">改用 OpenAI 官方接口</button></div><div class="pageNote">测试会先保存当前表单，再向所选模型发送一条纠错示例。测试和 AI 练习按服务商的输入、输出用量计费。ChatGPT 订阅与 API 单独计费。<br><a target="_blank" rel="noreferrer" href="' +
       v.guide +
       '">管理官方密钥 ↗</a>　<a target="_blank" rel="noreferrer" href="' +
       v.pricing +
-      '">查看价格 ↗</a></div><div class="inlineBtns"><button class="btn green" type="submit">保存 AI 配置</button><button class="btn" type="button" data-action="test">测试纠错</button>' +
+      '">查看价格 ↗</a>' +
+      (provider === "openai"
+        ? '　<a target="_blank" rel="noreferrer" href="https://platform.openai.com/settings/organization/billing/overview">API 账单 ↗</a>'
+        : "") +
+      (provider === "openai"
+        ? '<p><button type="button" class="btn" data-action="network">检查网络（免密钥）</button> 仅检查本站到 OpenAI 的连接，无需填写密钥，也不产生模型费用。</p>'
+        : "") +
+      '</div><div class="inlineBtns"><button class="btn green" type="submit">保存 AI 配置</button><button class="btn" type="button" data-action="test">测试日常模型</button><button class="btn" type="button" data-action="test-deep">测试深度模型</button>' +
       (stored?.configured
         ? '<button class="btn" type="button" data-action="clear">删除密钥</button>'
         : "") +
@@ -166,46 +170,114 @@ export function mountSettings(container) {
       provider = f.elements.provider.value;
       paint();
     };
+    const field = f.elements.key,
+      switcher = f.querySelector("[data-action=switch-openai]");
+    field.oninput = () => {
+      const error = keyInputError(provider, field.value);
+      field.setCustomValidity(error);
+      switcher.parentElement.hidden = !(
+        provider === "ark" && /^sk-(?:proj|svcacct)-/.test(field.value)
+      );
+      out.textContent = error;
+    };
+    field.onpaste = (e) => {
+      const pasted = e.clipboardData?.getData("text");
+      if (pasted && /[\s\\'"`]/.test(pasted)) {
+        e.preventDefault();
+        field.value = "";
+        const message = keyInputError(provider, pasted);
+        field.setCustomValidity(message);
+        out.textContent = message;
+        switcher.parentElement.hidden = true;
+      }
+    };
+    switcher.onclick = () => {
+      const entered = field.value;
+      provider = "openai";
+      paint();
+      const next = node.querySelector("[name=key]");
+      next.value = entered;
+      next.dispatchEvent(new Event("input"));
+      next.focus();
+    };
     const busy = (b) =>
       f
         .querySelectorAll("input,button,select")
         .forEach((x) => (x.disabled = b));
-    f.onsubmit = async (e) => {
-      e.preventDefault();
+    async function save() {
       const data = {
         provider,
         model: f.elements.model.value.trim(),
         deepModel: f.elements.deep.value.trim(),
       };
-      if (f.elements.key.value.trim())
-        data.apiKey = f.elements.key.value.trim();
+      if (field.value) data.apiKey = field.value;
+      cfg = await request("ai/settings", "PUT", data);
+      field.value = "";
+      updateProfile({ provider });
+    }
+    f.onsubmit = async (e) => {
+      e.preventDefault();
       busy(true);
       try {
-        cfg = await request("ai/settings", "PUT", data);
-        updateProfile({ provider });
-        paint("配置已保存。");
+        await save();
+        paint(
+          cfg.providers[provider].configured
+            ? "密钥与模型设置已保存。点击对应模型进行一次真实的纠错测试。"
+            : "模型设置已保存。当前服务商尚未添加密钥。",
+        );
       } catch (e) {
-        out.textContent = e.message;
+        out.textContent = aiErrorText(e);
       } finally {
         busy(false);
       }
     };
-    f.querySelector("[data-action=test]").onclick = async () => {
-      if (f.elements.key.value) {
-        out.textContent = "请先保存新密钥，再测试纠错。";
+    async function test(depth) {
+      if (!f.reportValidity()) return;
+      if (!field.value && !cfg?.providers?.[provider]?.configured) {
+        out.textContent = "请先在上方填写当前服务商的密钥。";
         return;
       }
       busy(true);
-      out.textContent = "正在向服务商发送示例句…";
+      out.textContent =
+        "正在测试" + (depth === "deep" ? "深度" : "日常") + "模型…";
+      let note;
       try {
-        const r = await request("ai/test", "POST", { provider });
-        out.textContent = r.text;
+        if (
+          field.value ||
+          cfg?.provider !== provider ||
+          f.elements.model.value.trim() !== stored?.model ||
+          f.elements.deep.value.trim() !== stored?.deepModel
+        )
+          await save();
+        const r = await request("ai/test", "POST", { provider, depth });
+        note = "纠错测试成功 · " + r.model + "。 " + r.text;
       } catch (e) {
-        out.textContent = e.message;
+        note = aiErrorText(e);
       } finally {
         busy(false);
       }
-    };
+      if (!field.value) paint(note);
+      else out.textContent = note;
+    }
+    f.querySelector("[data-action=test]").onclick = () => test("fast");
+    f.querySelector("[data-action=test-deep]").onclick = () => test("deep");
+    const probe = f.querySelector("[data-action=network]");
+    if (probe)
+      probe.onclick = async () => {
+        busy(true);
+        out.textContent = "正在检查服务端到 OpenAI 的网络连接…";
+        try {
+          const r = await request("ai/network", "POST");
+          out.textContent =
+            "网络可达 · OpenAI 模型列表返回 HTTP " +
+            r.providerStatus +
+            "。这次只检查网络。密钥与额度可通过日常或深度纠错测试确认。";
+        } catch (error) {
+          out.textContent = aiErrorText(error);
+        } finally {
+          busy(false);
+        }
+      };
     const clear = f.querySelector("[data-action=clear]");
     if (clear)
       clear.onclick = async () => {
@@ -217,7 +289,7 @@ export function mountSettings(container) {
           });
           paint("此账号的该服务商密钥已删除。");
         } catch (e) {
-          out.textContent = e.message;
+          out.textContent = aiErrorText(e);
         } finally {
           busy(false);
         }
@@ -227,10 +299,10 @@ export function mountSettings(container) {
   request("ai/settings")
     .then((r) => {
       cfg = r;
-      provider = r.provider || provider;
+      provider = requested || r.provider || provider;
       paint();
     })
-    .catch((e) => paint(e.message));
+    .catch((e) => paint(aiErrorText(e)));
   return () => {
     active = false;
   };

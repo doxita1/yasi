@@ -1,3 +1,4 @@
+import { aiResponse, aiErrorText } from "./ai-response.js";
 import { readingSets } from "./reading-lab.js";
 import { esc, icon } from "./icons.js";
 import { getState, saveAttempt, saveReview } from "./sync.js";
@@ -577,11 +578,9 @@ export function mountReadingRoom(
                 ),
               }),
             });
-          if (!r.ok) throw Error();
-          output.textContent = (await r.json()).text;
-        } catch {
-          output.textContent =
-            "尚未收到 AI 反馈。可直接使用上方证据与解析，或前往学习设置配置教练。";
+          output.textContent = (await aiResponse(r)).text;
+        } catch (error) {
+          output.textContent = aiErrorText(error);
         } finally {
           el.disabled = false;
         }

@@ -18,7 +18,9 @@ async function flush(page) {
 async function navigate(page, base, route) {
   await page.goto(base + "/#/" + route);
   await page.waitForFunction(
-    (route) => document.querySelector("#main")?.dataset.route === route,
+    (route) =>
+      document.querySelector("#main")?.dataset.route === route &&
+      !!document.querySelector("#main h1"),
     route,
   );
 }
@@ -69,7 +71,10 @@ export async function verifyMaterialsFlow(p, base) {
         headers: { cookie: "yasi-preview=" + other },
       });
       assert.ok(response.ok);
-      return (await response.json()).drafts["material:" + unit.id + ":rewrite"] || null;
+      return (
+        (await response.json()).drafts["material:" + unit.id + ":rewrite"] ||
+        null
+      );
     }
     const initialOtherDraft = await otherDraft();
     for (const ctx of [desk, phone]) {

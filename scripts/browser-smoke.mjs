@@ -252,6 +252,8 @@ try {
   await (await import("./output-browser.mjs")).verifyOutputLabFlow(p, base);
   await (await import("./input-browser-flows.mjs")).smokeInputRoutes(p, base);
   await (await import("./materials-browser.mjs")).verifyMaterialsFlow(p, base);
+  await (await import("./ai-settings-browser.mjs")).verifyAiSettings(p, base);
+  await (await import("./word-routes-browser.mjs")).verifyWordRoutes(p, base);
   assert.deepEqual(errors, []);
   console.log(
     "PASS · desktop/mobile resume, future day, core practice without AI, microphone upload, decoded lesson audio, two-account isolation, conflict drafts, 26-week library.",

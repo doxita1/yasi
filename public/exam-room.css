@@ -424,6 +424,25 @@
     flex-wrap: wrap;
   }
 }
+.homeWords {
+  display: flex;
+  gap: 14px;
+  padding: 20px;
+  align-items: flex-start;
+}
+.homeWords p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 6px 0 12px;
+}
+.homeWords .paperOptions {
+  align-items: center;
+  column-gap: 16px;
+}
+.homeWords .tileIcon {
+  flex-shrink: 0;
+}
 .paceCard {
   margin: 12px 0;
 }

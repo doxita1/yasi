@@ -1,3 +1,4 @@
+import { aiResponse, aiErrorText } from "./ai-response.js";
 import { esc } from "./icons.js";
 import {
   getState,
@@ -778,8 +779,7 @@ export function mountOutputLab(
         }),
         signal: controller.signal,
       });
-      if (!r.ok) throw Error(String(r.status));
-      const data = await r.json();
+      const data = await aiResponse(r);
       if (disposed || epoch !== serial) return;
       if (!data.text) throw Error();
       persist({
@@ -796,11 +796,8 @@ export function mountOutputLab(
       flushAll();
       notice = "已收到参考反馈。";
       render();
-    } catch {
-      if (!disposed && epoch === serial)
-        msg(
-          "本次没有取得 AI 反馈。可在 AI 设置配置模型；本页量表和示例可继续使用。",
-        );
+    } catch (error) {
+      if (!disposed && epoch === serial) msg(aiErrorText(error));
     } finally {
       if (ai === controller) ai = null;
     }

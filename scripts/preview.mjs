@@ -7,6 +7,25 @@ import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleApi } from "../server/api.js";
+import { startProxyChild } from "./preview-network.mjs";
+const childExit = await startProxyChild();
+if (childExit !== null) process.exit(childExit);
+if (process.argv.includes("--check-openai-network")) {
+  try {
+    const result = await fetch("https://api.openai.com/v1/models", {
+      redirect: "error",
+      signal: AbortSignal.timeout(12000),
+    });
+    console.log("OpenAI /v1/models (no key): HTTP " + result.status);
+    await result.body?.cancel();
+    process.exit(result.status === 401 ? 0 : 1);
+  } catch {
+    console.error(
+      "OpenAI /v1/models: no HTTP response. Check the preview server's network and proxy.",
+    );
+    process.exit(1);
+  }
+}
 const root = fileURLToPath(new URL("../", import.meta.url)),
   data = process.env.YASI_PREVIEW_DATA || path.join(root, ".local"),
   pub = path.join(root, "public");
@@ -133,7 +152,12 @@ http
       }
       if (url.pathname.startsWith("/api/")) {
         const headers = new Headers();
-        for (const name of ["content-type", "origin", "sec-fetch-site"])
+        for (const name of [
+          "content-type",
+          "origin",
+          "sec-fetch-site",
+          "x-yasi-account",
+        ])
           if (typeof req.headers[name] === "string")
             headers.set(name, req.headers[name]);
         const cookie =

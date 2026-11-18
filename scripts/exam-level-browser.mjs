@@ -22,7 +22,7 @@ const note = "Scope matters: check what the counter actually records.";
 const marked = "A museum door";
 const root = fileURLToPath(new URL("../", import.meta.url));
 
-async function withIsolatedPreview(run) {
+export async function withIsolatedPreview(run) {
   const reservation = createServer();
   reservation.listen(0, "127.0.0.1");
   await once(reservation, "listening");

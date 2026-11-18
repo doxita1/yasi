@@ -502,8 +502,7 @@ async function updateSettings(request, env, user) {
     data.clearKey === true || (data.apiKey !== undefined && data.apiKey !== "");
   let secret = null;
   if (updateKey && data.clearKey !== true) {
-    if (typeof data.apiKey !== "string" || !/^[!-~]{5,4096}$/.test(data.apiKey))
-      fail(400, "invalid_api_key");
+    validateProviderKey(provider, data.apiKey);
     secret = await seal(env, user, provider, data.apiKey);
   }
   await env.DB.batch([
@@ -528,13 +527,113 @@ async function updateSettings(request, env, user) {
   ]);
   return json(await settings(env.DB, user));
 }
+function validateProviderKey(provider, key) {
+  if (
+    typeof key !== "string" ||
+    !/^[!-~]{5,4096}$/.test(key) ||
+    /[\\'"`]/.test(key)
+  )
+    fail(400, "invalid_api_key");
+  if (provider === "ark" && /^sk-(?:proj|svcacct)-/.test(key))
+    fail(400, "provider_key_mismatch");
+}
+
+function rejectProvider(status, error, provider, model) {
+  // Upstream message strings can contain fragments of credentials. Return only our codes.
+  const signature = [error?.code, error?.type]
+    .filter((part) => typeof part === "string")
+    .join(" ")
+    .toLowerCase();
+  let code;
+  if (
+    /unsupported_country|country.*not_supported|region.*not_supported/.test(
+      signature,
+    )
+  )
+    code = "upstream_region";
+  else if (
+    /insufficient_quota|billing_hard_limit|insufficient_balance|accountoverdue/.test(
+      signature,
+    )
+  )
+    code = "upstream_quota";
+  else if (
+    /model_not_found|modelnotopen|invalidendpointormodel|modelnotfound|endpointnotfound|model.*(access|permission|not_available)/.test(
+      signature,
+    ) ||
+    status === 404
+  )
+    code = "upstream_model";
+  else if (
+    status === 401 ||
+    /invalid_api_key|authenticationerror/.test(signature)
+  )
+    code = "upstream_auth";
+  else if (status === 403) code = "upstream_permission";
+  else if (status === 429) code = "upstream_limit";
+  else if ([400, 422].includes(status)) code = "upstream_request";
+  else if (status === 408 || status === 504) code = "upstream_timeout";
+  else if (status >= 500) code = "upstream_service";
+  else code = "provider_rejected";
+  fail(502, code, { providerStatus: status, provider, model });
+}
+async function checkOpenAINetwork() {
+  // This probe never reads saved settings and only retries the uncredentialed model-list GET.
+  let response;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await fetch("https://api.openai.com/v1/models", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        redirect: "error",
+        signal: AbortSignal.timeout(6000),
+      });
+      break;
+    } catch (error) {
+      if (attempt === 1)
+        fail(
+          502,
+          ["TimeoutError", "AbortError"].includes(error?.name)
+            ? "upstream_timeout"
+            : "provider_unreachable",
+          { provider: "openai" },
+        );
+    }
+  }
+  const content = await response.json().catch(() => null);
+  if (
+    /unsupported_country|country.*not_supported|region.*not_supported/i.test(
+      content?.error?.code || "",
+    )
+  )
+    fail(502, "upstream_region", {
+      provider: "openai",
+      providerStatus: response.status,
+    });
+  if (
+    (response.status === 401 && content?.error) ||
+    (response.ok && Array.isArray(content?.data))
+  )
+    return json({
+      reachable: true,
+      provider: "openai",
+      providerStatus: response.status,
+    });
+  if (!content?.error || response.status === 403)
+    fail(502, "probe_gateway", {
+      provider: "openai",
+      providerStatus: response.status,
+    });
+  rejectProvider(response.status, content.error, "openai");
+}
 async function coach(request, env, user, testing) {
   const data = await body(request);
   let task = data.task,
     input = data.input;
   if (testing) {
     task = "grammar";
-    input = "She go to work on Monday. 请纠正这句话，并用中文说明原因。";
+    input =
+      "She go to work on Monday. 请用一般现在时纠正主谓一致，先写完整英文修正句，再用中文解释主语和动词形式。";
   }
   if (!Object.hasOwn(instructions, task)) fail(400, "unknown_task");
   if (typeof input !== "string" || !input.trim() || input.length > 30000)
@@ -552,6 +651,7 @@ async function coach(request, env, user, testing) {
   );
   if (!stored?.secret) fail(409, "provider_not_configured");
   const apiKey = await unseal(env, user, provider, stored.secret);
+  validateProviderKey(provider, apiKey);
   const model =
     data.depth === "deep"
       ? stored.deep_model || providerConfig[provider].deepModel
@@ -587,11 +687,17 @@ async function coach(request, env, user, testing) {
       signal: AbortSignal.timeout(55000),
       redirect: "error",
     });
-  } catch {
-    fail(502, "provider_unreachable");
+  } catch (error) {
+    const timeout = ["TimeoutError", "AbortError"].includes(error?.name);
+    fail(502, timeout ? "upstream_timeout" : "provider_unreachable", {
+      provider,
+      model,
+    });
   }
-  if (!response.ok)
-    fail(502, "provider_rejected", { providerStatus: response.status });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    rejectProvider(response.status, body?.error, provider, model);
+  }
   let result;
   try {
     result = await response.json();
@@ -609,8 +715,17 @@ async function coach(request, env, user, testing) {
       .map((part) => part.text)
       .join("\n")
       .trim();
-  if (!text) fail(502, "empty_provider_response");
-  if (testing && !/\bgoes\b/i.test(text)) fail(502, "unexpected_test_response");
+  if (result?.status === "failed")
+    rejectProvider(response.status, result.error, provider, model);
+  if (!text) fail(502, "empty_provider_response", { provider, model });
+  if (
+    testing &&
+    !(
+      /\bshe\s+goes\s+to\s+work\b/i.test(text.replace(/[*_`]/g, "")) &&
+      /[\u3400-\u9fff]/u.test(text)
+    )
+  )
+    fail(502, "unexpected_test_response", { provider, model });
   return json({ text, provider, model });
 }
 async function recording(request, env, user, id) {
@@ -714,6 +829,10 @@ export async function handleApi(request, env) {
     if (path === "/api/attempts") {
       requireMethod(method, ["POST"]);
       return await attempt(request, env.DB, user);
+    }
+    if (path === "/api/ai/network") {
+      requireMethod(method, ["POST"]);
+      return await checkOpenAINetwork();
     }
     if (path === "/api/ai/settings") {
       requireMethod(method, ["GET", "PUT"]);

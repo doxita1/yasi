@@ -33,6 +33,7 @@ const TABS = [
     "学习空间",
     [
       ["home", "home", "学习工作台"],
+      ["words", "words", "雅思核心词汇"],
       ["courses", "layers", "全部课程"],
       ["quickreview", "review", "每日复习"],
       ["mistakes", "review", "雅思错题本"],
@@ -47,7 +48,7 @@ const TABS = [
       ["listening", "headphones", "听力精练"],
       ["writing", "pen", "写作批改"],
       ["speaking", "mic", "口语考场"],
-      ["lexis", "words", "学术词汇"],
+      ["lexis", "words", "学术搭配"],
       ["dictation", "headphones", "词汇听写"],
       ["accuracy", "grammar", "语法与改写"],
       ["mocks", "flag", "模拟考试"],
@@ -443,6 +444,7 @@ async function render() {
       listening: "听力精练",
       writing: "写作批改",
       speaking: "口语考场",
+      words: a === "errors" ? "单词错题本" : "雅思核心词汇",
       quickreview: "每日复习",
       materials: "资料精练",
       dictation: "词汇听写",
@@ -481,6 +483,12 @@ async function render() {
           track: curTrack(),
           onNavigate: nav,
         });
+      return;
+    }
+    if (page === "words") {
+      const { mountCoreWords } = await import("./core-words.js");
+      if (run === version)
+        dispose = mountCoreWords(main, { unit: a, view: b, onNavigate: nav });
       return;
     }
     if (page === "quickreview") {
@@ -553,7 +561,7 @@ async function render() {
       return;
     }
     if (page === "settings") {
-      dispose = mountSettings(main);
+      dispose = mountSettings(main, { provider: a });
       return;
     }
     if (page === "mocks") {

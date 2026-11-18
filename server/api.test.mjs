@@ -263,13 +263,22 @@ test("both AI providers use encrypted account-scoped keys, preserve settings, an
     ).json();
     assert.equal(separate.providers[provider].configured, false);
     const switched = await (
-      await call("ai/settings", "PUT", { provider, model: "another-model", deepModel: "advanced-review" })
+      await call("ai/settings", "PUT", {
+        provider,
+        model: "another-model",
+        deepModel: "advanced-review",
+      })
     ).json();
     assert.equal(switched.providers[provider].configured, true);
     assert.equal(switched.providers[provider].deepModel, "advanced-review");
-    const deep = await (await call("coach", "POST", {
-      provider, task: "writing", input: "Our deadline is Monday.", depth: "deep",
-    })).json();
+    const deep = await (
+      await call("coach", "POST", {
+        provider,
+        task: "writing",
+        input: "Our deadline is Monday.",
+        depth: "deep",
+      })
+    ).json();
     assert.equal(deep.model, "advanced-review");
     assert.equal(seen.at(-1).data.model, "advanced-review");
     await call("ai/settings", "PUT", { provider, clearKey: true });
@@ -305,7 +314,190 @@ test("invalid input, missing vault and upstream errors are actionable and contai
   const response = await call("ai/test", "POST", { provider: "ark" });
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), {
-    error: "provider_rejected",
+    error: "upstream_limit",
     providerStatus: 429,
+    provider: "ark",
+    model: "doubao-seed-2-1-lite-260915",
   });
+});
+
+test("model diagnostics distinguish billing, permissions, errors, timeouts and a usable correction", async (t) => {
+  const { call } = fixture(),
+    provider = "openai",
+    model = "test-daily",
+    deepModel = "test-deep";
+  await call("ai/settings", "PUT", {
+    provider,
+    model,
+    deepModel,
+    apiKey: "fictional-key-for-test",
+  });
+  let reply;
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, req) => {
+    calls.push(JSON.parse(req.body).model);
+    if (reply instanceof Error) throw reply;
+    return reply;
+  });
+  for (const [status, upstream, expected] of [
+    [401, "invalid_api_key", "upstream_auth"],
+    [403, "permission_denied", "upstream_permission"],
+    [403, "unsupported_country_region_territory", "upstream_region"],
+    [404, "model_not_found", "upstream_model"],
+    [429, "insufficient_quota", "upstream_quota"],
+    [429, "rate_limit_exceeded", "upstream_limit"],
+    [500, "internal_error", "upstream_service"],
+  ]) {
+    reply = Response.json(
+      {
+        error: {
+          code: upstream,
+          message: "PRIVATE detail fictional-key-for-test",
+        },
+      },
+      { status },
+    );
+    const response = await call("ai/test", "POST", { provider, depth: "deep" });
+    assert.deepEqual(await response.json(), {
+      error: expected,
+      providerStatus: status,
+      provider,
+      model: deepModel,
+    });
+    assert.equal(calls.at(-1), deepModel);
+  }
+  for (const [error, expected] of [
+    [new TypeError("connection reset"), "provider_unreachable"],
+    [new DOMException("timeout", "TimeoutError"), "upstream_timeout"],
+  ]) {
+    reply = error;
+    assert.equal(
+      (await (await call("ai/test", "POST", { provider })).json()).error,
+      expected,
+    );
+  }
+  reply = Response.json({ output_text: "goes" });
+  assert.equal(
+    (await (await call("ai/test", "POST", { provider })).json()).error,
+    "unexpected_test_response",
+  );
+  reply = Response.json({
+    output_text: "She goes to work on Mondays. 主语为第三人称单数。",
+  });
+  assert.match(
+    (await (await call("ai/test", "POST", { provider, depth: "deep" })).json())
+      .text,
+    /She goes/,
+  );
+});
+
+test("a misplaced provider credential is rejected before storage or transmission, including legacy encrypted settings", async (t) => {
+  const { call, sql, env } = fixture();
+  const auth = "sk-proj-fictional-fixture-only";
+  const fetcher = t.mock.method(globalThis, "fetch", () => {
+    throw Error("unexpected transmission");
+  });
+  for (const [value, code] of [
+    [auth, "provider_key_mismatch"],
+    ["example\\", "invalid_api_key"],
+    ["example ", "invalid_api_key"],
+  ]) {
+    const response = await call("ai/settings", "PUT", {
+      provider: "ark",
+      apiKey: value,
+    });
+    assert.equal((await response.json()).error, code);
+  }
+  assert.equal(sql.prepare("SELECT count(*) AS n FROM ai_config").get().n, 0);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    Buffer.from(env.AI_VAULT_KEY, "base64"),
+    "AES-GCM",
+    false,
+    ["encrypt"],
+  );
+  const associated = new TextEncoder().encode(JSON.stringify(["alice", "ark"]));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: associated },
+    key,
+    new TextEncoder().encode(auth),
+  );
+  const sealed =
+    Buffer.from(iv).toString("base64") +
+    "." +
+    Buffer.from(ciphertext).toString("base64");
+  sql
+    .prepare(
+      "INSERT INTO ai_config(owner,provider,model,secret) VALUES (?,?,?,?)",
+    )
+    .run("alice", "ark", "demo-model", sealed);
+  assert.equal(
+    (await (await call("ai/test", "POST", { provider: "ark" })).json()).error,
+    "provider_key_mismatch",
+  );
+  assert.equal(fetcher.mock.callCount(), 0);
+});
+test("network diagnostics perform only anonymous fixed model-list GETs and retry a transient connection failure once", async (t) => {
+  const { call } = fixture(),
+    answers = [];
+  const probe = () => call("ai/network", "POST", undefined);
+  const traffic = t.mock.method(globalThis, "fetch", async (url, req) => {
+    assert.equal(url, "https://api.openai.com/v1/models");
+    assert.equal(req.method, "GET");
+    assert.deepEqual(
+      [...new Headers(req.headers)],
+      [["accept", "application/json"]],
+    );
+    assert.equal(req.body, undefined);
+    assert.equal(req.redirect, "error");
+    assert.ok(req.signal instanceof AbortSignal);
+    const next = answers.shift();
+    if (next instanceof Error) throw next;
+    return next;
+  });
+  assert.equal((await call("ai/network", "POST", undefined, "")).status, 401);
+  assert.equal(traffic.mock.callCount(), 0);
+  answers.push(
+    new TypeError("private transport details"),
+    Response.json({ error: { code: "missing_api_key" } }, { status: 401 }),
+  );
+  assert.deepEqual(await (await probe()).json(), {
+    provider: "openai",
+    providerStatus: 401,
+    reachable: true,
+  });
+  answers.push(
+    Response.json(
+      {
+        error: {
+          code: "unsupported_country_region_territory",
+          message: "private upstream details",
+        },
+      },
+      { status: 403 },
+    ),
+  );
+  assert.deepEqual(await (await probe()).json(), {
+    provider: "openai",
+    providerStatus: 403,
+    error: "upstream_region",
+  });
+  answers.push(
+    new Response("<html>private gateway details</html>", { status: 403 }),
+  );
+  assert.deepEqual(await (await probe()).json(), {
+    provider: "openai",
+    providerStatus: 403,
+    error: "probe_gateway",
+  });
+  answers.push(
+    new DOMException("private timeout", "TimeoutError"),
+    new DOMException("private timeout", "TimeoutError"),
+  );
+  assert.deepEqual(await (await probe()).json(), {
+    provider: "openai",
+    error: "upstream_timeout",
+  });
+  assert.equal(traffic.mock.callCount(), 6);
 });
