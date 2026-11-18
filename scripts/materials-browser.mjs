@@ -63,6 +63,15 @@ export async function verifyMaterialsFlow(p, base) {
       unitRoute = routeFor(unit),
       day = planDay(unit),
       dayRoute = "day/" + day;
+    const other = owner === "a" ? "b" : "a";
+    async function otherDraft() {
+      const response = await fetch(url + "/api/state", {
+        headers: { cookie: "yasi-preview=" + other },
+      });
+      assert.ok(response.ok);
+      return (await response.json()).drafts["material:" + unit.id + ":rewrite"] || null;
+    }
+    const initialOtherDraft = await otherDraft();
     for (const ctx of [desk, phone]) {
       await ctx.addCookies([{ url, name: "yasi-preview", value: owner }]);
       await ctx.route("**/*", (r) =>
@@ -201,16 +210,7 @@ export async function verifyMaterialsFlow(p, base) {
       await mobile.locator(".taskCard .readFeedback").innerText(),
       /3\s*\/\s*4/,
     );
-    const other = owner === "a" ? "b" : "a";
-    const r = await fetch(url + "/api/state", {
-      headers: { cookie: "yasi-preview=" + other },
-    });
-    assert.ok(r.ok);
-    const { drafts: otherDrafts } = await r.json();
-    assert.notEqual(
-      otherDrafts["material:" + unit.id + ":rewrite"]?.text,
-      final,
-    );
+    assert.deepEqual(await otherDraft(), initialOtherDraft);
     assert.deepEqual(errors, []);
     console.log(
       "PASS · materials catalogue, linked study day, radio recall, correction, gated rewrite, synced private draft",
