@@ -424,3 +424,52 @@
     flex-wrap: wrap;
   }
 }
+.paceCard {
+  margin: 12px 0;
+}
+.pacePaths {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.pacePaths a {
+  display: grid;
+  gap: 8px;
+  background: #f4f6ed;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 13px;
+}
+.pacePaths a:hover {
+  border-color: var(--green);
+}
+.pacePaths span,
+.paceControl {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+.paceControl select {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px;
+  background: white;
+  color: var(--green);
+}
+.paceFooter {
+  margin-top: 14px;
+}
+.pacePaths b {
+  font-size: 14px;
+}
+@media (max-width: 480px) {
+  .paceControl {
+    flex-wrap: wrap;
+    justify-content: end;
+  }
+  .pacePaths {
+    grid-template-columns: 1fr;
+  }
+}

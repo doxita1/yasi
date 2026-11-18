@@ -60,7 +60,9 @@ export function mountSettings(container) {
     cfg = null,
     provider = getState().profile.provider || "ark";
   const p = getState().profile,
-    bands = Array.from({ length: 13 }, (_, i) => 3 + i / 2);
+    bands = Array.from({ length: 13 }, (_, i) => 3 + i / 2),
+    presets = [15, 20, 30, 45, 60],
+    custom = !presets.includes(p.dailyMinutes);
   container.innerHTML =
     '<header class="pageHead"><div><span class="eyebrow">PREFERENCES</span><h1>学习设置</h1><p>调整学习目标，或为当前账号添加 AI 教练。</p></div></header><div class="settingGrid"><section class="panel panelBody"><h2 class="cardTitle">我的学习目标</h2><form class="goalForm" id="profileForm" style="margin-top:18px"><label>考试方向<select name="track">' +
     [
@@ -74,13 +76,42 @@ export function mountSettings(container) {
     bands.map((x) => opt(x, x.toFixed(1), p.targetBand)).join("") +
     '</select></label><label>单项最低分<select name="min">' +
     bands.map((x) => opt(x, x.toFixed(1), p.minBand)).join("") +
-    '</select></label></div><button class="btn green">保存学习目标</button><output class="formStatus"></output></form><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><h2 class="cardTitle">账号与访问</h2><p class="pageNote">此学习室采用邀请制，学习记录、录音和 AI 额度按账号隔离。在手机和电脑上使用同一个 ChatGPT 账号即可续练。</p><a class="btn" href="/signout-with-chatgpt?return_to=/" target="_top">退出当前账号</a></section><section class="panel panelBody"><h2 class="cardTitle">' +
+    '</select></label></div><label>每日建议时长<select name="dailyMinutes" aria-describedby="minutesHelp">' +
+    presets.map((n) => opt(n, n + " 分钟", p.dailyMinutes)).join("") +
+    opt("custom", "自定时长", custom ? "custom" : "") +
+    "</select></label><div data-custom-minutes" +
+    (custom ? "" : " hidden") +
+    '><label>自定分钟数（5–180）<input type="number" name="customMinutes" min="5" max="180" step="1" inputmode="numeric" value="' +
+    esc(p.dailyMinutes) +
+    '" required' +
+    (custom ? "" : " disabled") +
+    '></label></div><small class="pageNote" id="minutesHelp">用来安排当天的练习和复习，可随时调整。</small><button class="btn green">保存学习目标</button><output class="formStatus" aria-live="polite"></output></form><hr style="border:0;border-top:1px solid var(--line);margin:20px 0"><h2 class="cardTitle">账号与访问</h2><p class="pageNote">此学习室采用邀请制，学习记录、录音和 AI 额度按账号隔离。在手机和电脑上使用同一个 ChatGPT 账号即可续练。</p><a class="btn" href="/signout-with-chatgpt?return_to=/" target="_top">退出当前账号</a></section><section class="panel panelBody"><h2 class="cardTitle">' +
     icon("spark", 17) +
     ' AI 教练</h2><p class="pageNote">基础课程随时可练。需要个性化反馈时，选择服务商并添加个人密钥。</p><div id="aiForm"></div></section></div>';
   const form = container.querySelector("#profileForm");
+  const minuteSelect = form.elements.dailyMinutes,
+    customMinutes = form.elements.customMinutes;
+  minuteSelect.onchange = () => {
+    const show = minuteSelect.value === "custom";
+    customMinutes.disabled = !show;
+    form.querySelector("[data-custom-minutes]").hidden = !show;
+    if (show) customMinutes.focus();
+  };
   form.onsubmit = (e) => {
     e.preventDefault();
     const f = new FormData(form);
+    const dailyMinutes = Number(
+      f.get(minuteSelect.value === "custom" ? "customMinutes" : "dailyMinutes"),
+    );
+    if (
+      !Number.isInteger(dailyMinutes) ||
+      dailyMinutes < 5 ||
+      dailyMinutes > 180
+    ) {
+      form.querySelector("output").textContent =
+        "请输入 5 至 180 之间的整数分钟。";
+      return;
+    }
     if (Number(f.get("min")) > Number(f.get("target"))) {
       form.querySelector("output").textContent =
         "单项下限应小于或等于总分目标。";
@@ -90,6 +121,7 @@ export function mountSettings(container) {
       track: f.get("track"),
       targetBand: Number(f.get("target")),
       minBand: Number(f.get("min")),
+      dailyMinutes,
     });
     form.querySelector("output").textContent = "学习目标已保存。";
   };

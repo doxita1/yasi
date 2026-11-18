@@ -12,12 +12,14 @@ import { mountSettings } from "./settings.js";
 import { resourcePanel } from "./resources.js";
 import {
   deskHtml,
+  dayPlan,
   mountStudyDay,
   mistakesHtml,
   labReportHtml,
   isDayDone,
   currentStudyDay,
 } from "./exam-desk.js";
+import { bindPacing, minutesFor } from "./pacing.js";
 import { skillsPanel, bindEvidence } from "./progress.js";
 
 const BASE = {
@@ -32,6 +34,7 @@ const TABS = [
     [
       ["home", "home", "学习工作台"],
       ["courses", "layers", "全部课程"],
+      ["quickreview", "review", "每日复习"],
       ["mistakes", "review", "雅思错题本"],
       ["report", "chart", "学习报告"],
       ["materials", "layers", "资料精练"],
@@ -440,6 +443,7 @@ async function render() {
       listening: "听力精练",
       writing: "写作批改",
       speaking: "口语考场",
+      quickreview: "每日复习",
       materials: "资料精练",
       dictation: "词汇听写",
       lexis: "学术词汇",
@@ -476,6 +480,14 @@ async function render() {
           attemptId,
           track: curTrack(),
           onNavigate: nav,
+        });
+      return;
+    }
+    if (page === "quickreview") {
+      const { mountQuickReview } = await import("./daily-review.js");
+      if (run === version)
+        dispose = mountQuickReview(main, {
+          minutes: minutesFor(state().profile.dailyMinutes),
         });
       return;
     }
@@ -558,6 +570,7 @@ async function render() {
           : page === "report"
             ? report()
             : deskHtml();
+    if (page === "home") dispose = bindPacing(main, dayPlan);
     if (page === "report") {
       main
         .querySelector(".column")

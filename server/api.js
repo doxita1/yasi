@@ -333,6 +333,15 @@ async function mergeProgress(db, user, key, value) {
 async function progress(request, db, user, key) {
   const data = await body(request);
   if (!Object.hasOwn(data, "value")) fail(400, "missing_value");
+  if (
+    key === "profile" &&
+    data.value &&
+    Object.hasOwn(data.value, "dailyMinutes")
+  ) {
+    const minutes = data.value.dailyMinutes;
+    if (!Number.isInteger(minutes) || minutes < 5 || minutes > 180)
+      fail(400, "invalid_daily_minutes");
+  }
   if (key.startsWith("attempt.") || key.startsWith("review."))
     return json({ key, value: await mergeProgress(db, user, key, data.value) });
   await stmt(

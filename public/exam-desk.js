@@ -1,3 +1,4 @@
+import { pacingHtml, bindPacing } from "./pacing.js";
 import { icon, esc } from "./icons.js";
 import { getDay, weekTitles } from "./curriculum.js";
 import { readingSets } from "./reading-lab.js";
@@ -207,7 +208,9 @@ export function deskHtml() {
     '</p><div class="heroActions">' +
     button(startRoute, currentLabel, true) +
     button("day/" + Math.min(day + 1, LIMIT), "学习下一天") +
-    '</div></div></section><div><div class="sectionRow" style="margin-bottom:12px"><h2 class="cardTitle">雅思四科训练</h2>' +
+    "</div></div></section>" +
+    pacingHtml(day, dayPlan(day)) +
+    '<div><div class="sectionRow" style="margin-bottom:12px"><h2 class="cardTitle">雅思四科训练</h2>' +
     aLink("mocks", "进入整卷模考 " + icon("right", 14), "miniAction") +
     '</div><div class="skillShelf">' +
     actions
@@ -313,9 +316,11 @@ export function mountStudyDay(container, n) {
     (p.day < LIMIT ? aLink("day/" + (p.day + 1), icon("right", 14)) : "") +
     "</div>" +
     aLink("courses", "全部课程 →", "miniAction") +
-    '</div><section class="panel panelBody taskCard"><span class="eyebrow">01 · 专项训练</span><h2>' +
+    "</div>" +
+    pacingHtml(p.day, p) +
+    '<section class="panel panelBody taskCard"><span class="eyebrow">01 · 专项训练</span><h2>' +
     esc(p.sub) +
-    '</h2><p class="pageNote">按任务完成作答并交卷。后续周再次遇到同一资料时，复核上一次的错误与证据。</p>' +
+    '</h2><p class="pageNote">按自己有空的时间练，可以分几天完成。重遇同一资料时，复核上一次的错误与证据。</p>' +
     button(p.route, existing() ? "重看已交专项" : "进入" + p.name, true) +
     '</section><section class="panel panelBody taskCard"><span class="eyebrow">02 · 迁移与订正</span><h2>把今天的考点用一次</h2><p>' +
     esc(p.transfer) +
@@ -369,7 +374,7 @@ export function mountStudyDay(container, n) {
       ? "专项与复盘均已完成。"
       : "复盘已保存，完成专项后计入学习日。";
   };
-  return () => {};
+  return bindPacing(container, dayPlan);
 }
 export function mistakesHtml() {
   const store = getState(),

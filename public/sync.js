@@ -25,7 +25,7 @@ function fresh() {
       track: "undecided",
       targetBand: 7,
       minBand: 6.5,
-      dailyMinutes: 60,
+      dailyMinutes: 30,
       startDate: localDate(),
       provider: "ark",
     },
@@ -53,9 +53,24 @@ function localWrite(key, value) {
     return false;
   }
 }
+function restoreProfile(defaults, saved) {
+  const profile = { ...defaults, ...saved };
+  const minutes = Number(profile.dailyMinutes);
+  profile.dailyMinutes =
+    Number.isInteger(minutes) && minutes >= 5 && minutes <= 180 ? minutes : 30;
+  return profile;
+}
+function restoreState(snapshot) {
+  const defaults = fresh();
+  return {
+    ...defaults,
+    ...snapshot,
+    profile: restoreProfile(defaults.profile, snapshot?.profile),
+  };
+}
 function readScope(id) {
   try {
-    return Object.assign(fresh(), JSON.parse(localRead("state:" + id) || "{}"));
+    return restoreState(JSON.parse(localRead("state:" + id) || "{}"));
   } catch {
     return fresh();
   }
@@ -162,7 +177,7 @@ function mergeRemote(remote) {
   const queued = (type, key) => Object.hasOwn(store.queue, type + "/" + key);
   for (const [key, val] of Object.entries(remote.progress || {})) {
     if (queued("progress", key)) continue;
-    if (key === "profile") store.profile = { ...store.profile, ...val };
+    if (key === "profile") store.profile = restoreProfile(store.profile, val);
     else if (key.startsWith("attempt.")) store.attempts[key.slice(8)] = val;
     else if (key.startsWith("review.")) store.review[key.slice(7)] = val;
   }
@@ -203,7 +218,7 @@ export function initSync() {
       try {
         const recovered = JSON.parse(archived);
         if ((recovered.savedAt || "") > (store.savedAt || ""))
-          store = Object.assign(fresh(), recovered);
+          store = restoreState(recovered);
       } catch {}
     }
     store.syncStatus = authenticated

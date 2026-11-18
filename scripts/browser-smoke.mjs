@@ -119,6 +119,14 @@ try {
     await p.getByRole("heading", { name: "雅思备考工作台" }).count(),
     1,
   );
+  assert.equal(await p.locator("[data-pace]").inputValue(), "30");
+  await p.locator("[data-pace]").selectOption("20");
+  assert.match(await p.locator(".pacePaths").innerText(), /复习约 5 分钟/);
+  await flush(p);
+  await open(m, "day/2");
+  assert.equal(await m.locator("[data-pace]").inputValue(), "20");
+  await p.locator("[data-pace]").selectOption("30");
+  await flush(p);
   const screenshotRoot = process.env.YASI_QA_SHOTS;
   if (screenshotRoot)
     await p.screenshot({
